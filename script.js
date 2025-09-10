@@ -88,40 +88,67 @@ function hideUserInfo() {
 }
 
 // API Functions
-async function apiRequest(endpoint, method = 'GET', data = null) {
-    try {
-        showLoading();
-        
-        const url = new URL(API_BASE);
-        url.searchParams.append('key', API_KEY);
-        
-        if (endpoint.includes('tabela=')) {
-            url.searchParams.append('tabela', endpoint.split('tabela=')[1]);
-        } else {
-            url.searchParams.append('tabela', endpoint);
+async function apiRequest(tabela, method = 'GET', data = null) {
+    showLoading();
+
+    // JSONP for GET requests
+    if (method === 'GET') {
+        return new Promise((resolve, reject) => {
+            const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+            window[callbackName] = function(data) {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                hideLoading();
+                if (data.success) {
+                    resolve(data);
+                } else {
+                    console.error('API Error (JSONP):', data.erro);
+                    showAlert('Erro de API', data.erro || 'Ocorreu um erro ao buscar os dados.');
+                    reject(data);
+                }
+            };
+
+            const script = document.createElement('script');
+            script.src = `${API_BASE}?tabela=${tabela}&key=${API_KEY}&callback=${callbackName}`;
+            script.onerror = () => {
+                delete window[callbackName];
+                document.body.removeChild(script);
+                hideLoading();
+                const errorMsg = 'Não foi possível conectar ao servidor. Verifique a URL da API e a sua conexão.';
+                console.error('API Error:', errorMsg);
+                showAlert('Erro de Conexão', errorMsg);
+                reject(errorMsg);
+            };
+            document.body.appendChild(script);
+        });
+    }
+
+    // Fetch with CORS for POST requests (as per Google Apps Script example)
+    if (method === 'POST') {
+        try {
+            const url = new URL(API_BASE);
+            url.searchParams.append('tabela', tabela);
+            url.searchParams.append('key', API_KEY);
+
+            const response = await fetch(url.toString(), {
+                method: 'POST',
+                body: JSON.stringify(data),
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8', // Required by Google Apps Script
+                },
+                mode: 'no-cors' // POST requests to Apps Script often need this
+            });
+            
+            hideLoading();
+            // no-cors mode doesn't allow reading the response, so we assume success
+            return { success: true }; 
+
+        } catch (error) {
+            hideLoading();
+            console.error('API POST Error:', error);
+            showAlert('Erro', 'Erro de conexão ao salvar os dados. Tente novamente.');
+            return null;
         }
-        
-        const options = {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        };
-        
-        if (data && method === 'POST') {
-            options.body = JSON.stringify(data);
-        }
-        
-        const response = await fetch(url.toString(), options);
-        const result = await response.json();
-        
-        hideLoading();
-        return result;
-    } catch (error) {
-        hideLoading();
-        console.error('API Error:', error);
-        showAlert('Erro', 'Erro de conexão com o servidor. Tente novamente.');
-        return null;
     }
 }
 
@@ -1119,14 +1146,9 @@ async function apiRequestEnhanced(tabela, method = 'GET', data = null) {
     }
 }
 
-// Update existing API calls to use enhanced version
-function updateApiCalls() {
-    // Replace apiRequest with apiRequestEnhanced in all existing functions
-    window.apiRequest = apiRequestEnhanced;
-}
 
-// Initialize enhanced API
-updateApiCalls();
+
+
 
 // Add global functions for HTML onclick events
 window.viewRespostas = viewRespostas;
@@ -1468,72 +1490,11 @@ document.head.appendChild(accessibilityStyle);
 
 
 // Local testing mode with mock data
-const LOCAL_TESTING = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
 
 // Mock data for local testing
-const MOCK_DATA = {
-    usuario: {
-        success: true,
-        data: [
-            { usuario: 'admin', senha: 'tatubola' }
-        ]
-    },
-    prova: {
-        success: true,
-        data: []
-    },
-    questao: {
-        success: true,
-        data: []
-    },
-    resposta: {
-        success: true,
-        data: []
-    }
-};
 
-// Enhanced API request function with local testing support
-async function apiRequestWithLocalTesting(tabela, method = 'GET', data = null) {
-    // If running locally, use mock data
-    if (LOCAL_TESTING) {
-        console.log('LOCAL TESTING MODE - Using mock data for tabela:', tabela);
-        
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        if (method === 'GET') {
-            return MOCK_DATA[tabela] || { success: false, error: 'Table not found' };
-        } else if (method === 'POST') {
-            // For POST requests, just return success
-            console.log('Mock POST request for', tabela, 'with data:', data);
-            return { success: true };
-        }
-    }
-    
-    // For production, use the original API request
-    return apiRequestEnhanced(tabela, method, data);
-}
 
 // Override the global apiRequest function for local testing
-if (LOCAL_TESTING) {
-    console.log('🧪 LOCAL TESTING MODE ENABLED - Using mock data');
-    window.apiRequest = apiRequestWithLocalTesting;
-    
-    // Add a visual indicator for local testing
-    const indicator = document.createElement('div');
-    indicator.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: #ff6b6b;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-size: 12px;
-        z-index: 10000;
-        font-family: monospace;
-    `;
-    indicator.textContent = '🧪 LOCAL TESTING MODE';
-    document.body.appendChild(indicator);
-}
+
 
