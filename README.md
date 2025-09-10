@@ -64,13 +64,6 @@ WM_Prova_Online/
 └── test_results.md     # Resultados dos testes
 ```
 
-## 🔧 Configuração da API
-
-O sistema utiliza a seguinte configuração para integração com Google Sheets:
-
-- **Endpoint:** `https://script.google.com/macros/s/AKfycbwr4CwGenJ8Gf10svE3zOA_QiQJ3kAyZ9KyqNUT0NGQkImmJ68MkOX_tZnjFCJOD8XA/exec`
-- **Chave de API:** `carambola@01`
-
 ### Estrutura das Tabelas
 
 #### Tabela `usuario`
@@ -114,7 +107,7 @@ O sistema utiliza a seguinte configuração para integração com Google Sheets:
 1. Faça upload dos arquivos para um repositório GitHub
 2. Vá em Settings > Pages
 3. Selecione a branch main como source
-4. O sistema estará disponível em `https://seuusuario.github.io/nome-do-repositorio`
+4. O sistema estará disponível em `https://wcmendes.github.io/wmprovaonline`
 
 ## 📱 Compatibilidade
 
@@ -141,8 +134,4 @@ O sistema utiliza a seguinte configuração para integração com Google Sheets:
 ## 🆘 Suporte
 
 Para suporte técnico ou dúvidas sobre o sistema, entre em contato com o desenvolvedor.
-
----
-
-**Desenvolvido com ❤️ para educação online**
 
