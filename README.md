@@ -107,7 +107,7 @@ WM_Prova_Online/
 1. Faça upload dos arquivos para um repositório GitHub
 2. Vá em Settings > Pages
 3. Selecione a branch main como source
-4. O sistema estará disponível em `https://seuusuario.github.io/nome-do-repositorio`
+4. O sistema estará disponível em `https://wcmendes.github.io/wmprovaonline`
 
 ## 📱 Compatibilidade
 
@@ -134,8 +134,4 @@ WM_Prova_Online/
 ## 🆘 Suporte
 
 Para suporte técnico ou dúvidas sobre o sistema, entre em contato com o desenvolvedor.
-
----
-
-**Desenvolvido com ❤️ para educação online**
 
