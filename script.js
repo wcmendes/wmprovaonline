@@ -129,7 +129,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 async function loginProfessor(usuario, senha) {
     const users = await apiRequest('usuario');
     if (!users || !users.data) {
-        showAlert('Erro', 'Erro ao verificar credenciais.\n' + JSON.stringify(users));
+        showAlert('Erro', 'Erro ao verificar credenciaisX\n' + JSON.stringify(users));
         showAlert('Erro', 'Erro ao verificar credenciais.');
         return false;
     }
