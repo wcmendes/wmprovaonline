@@ -1464,3 +1464,74 @@ accessibilityStyle.textContent = `
 `;
 document.head.appendChild(accessibilityStyle);
 
+
+// Local testing mode with mock data
+const LOCAL_TESTING = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// Mock data for local testing
+const MOCK_DATA = {
+    usuario: {
+        success: true,
+        data: [
+            { usuario: 'admin', senha: 'tatubola' }
+        ]
+    },
+    prova: {
+        success: true,
+        data: []
+    },
+    questao: {
+        success: true,
+        data: []
+    },
+    resposta: {
+        success: true,
+        data: []
+    }
+};
+
+// Enhanced API request function with local testing support
+async function apiRequestWithLocalTesting(tabela, method = 'GET', data = null) {
+    // If running locally, use mock data
+    if (LOCAL_TESTING) {
+        console.log('LOCAL TESTING MODE - Using mock data for tabela:', tabela);
+        
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (method === 'GET') {
+            return MOCK_DATA[tabela] || { success: false, error: 'Table not found' };
+        } else if (method === 'POST') {
+            // For POST requests, just return success
+            console.log('Mock POST request for', tabela, 'with data:', data);
+            return { success: true };
+        }
+    }
+    
+    // For production, use the original API request
+    return apiRequestEnhanced(tabela, method, data);
+}
+
+// Override the global apiRequest function for local testing
+if (LOCAL_TESTING) {
+    console.log('🧪 LOCAL TESTING MODE ENABLED - Using mock data');
+    window.apiRequest = apiRequestWithLocalTesting;
+    
+    // Add a visual indicator for local testing
+    const indicator = document.createElement('div');
+    indicator.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: #ff6b6b;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 12px;
+        z-index: 10000;
+        font-family: monospace;
+    `;
+    indicator.textContent = '🧪 LOCAL TESTING MODE';
+    document.body.appendChild(indicator);
+}
+
