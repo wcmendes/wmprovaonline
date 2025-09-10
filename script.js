@@ -130,8 +130,8 @@ async function loginProfessor(usuario, senha) {
     const users = await apiRequest('usuario');
     if (!users || !users.data) {
         showAlert('Erro', 'Erro ao verificar credenciais.');
-        showAlert(users.data);
-        showAlert(users);
+        showAlert('Erro', 'Erro ao verificar credenciais.\n' + JSON.stringify(users.data));
+        showAlert('Erro', 'Erro ao verificar credenciais.\n' + JSON.stringify(users));
         return false;
     }
     
