@@ -145,8 +145,34 @@ async function apiRequest(tabela, method = 'GET', data = null) {
 
         } catch (error) {
             hideLoading();
-            console.error('API POST Error:', error);
-            showAlert('Erro', 'Erro de conexão ao salvar os dados. Tente novamente.');
+            console.error("API POST Error:", error);
+            showAlert("Erro", "Erro de conexão ao salvar os dados. Tente novamente.");
+            return null;
+        }
+    }
+
+    // Fetch with CORS for PUT requests
+    if (method === "PUT") {
+        try {
+            const url = new URL(API_BASE);
+            url.searchParams.append("tabela", tabela);
+            url.searchParams.append("key", API_KEY);
+
+            const response = await fetch(url.toString(), {
+                method: "POST", // Google Apps Script uses doPost for PUT actions
+                body: JSON.stringify({ ...data, action: "update" }), // Add action for GAS
+                headers: {
+                    "Content-Type": "text/plain;charset=utf-8",
+                },
+                mode: "no-cors",
+            });
+
+            hideLoading();
+            return { success: true };
+        } catch (error) {
+            hideLoading();
+            console.error("API PUT Error:", error);
+            showAlert("Erro", "Erro de conexão ao atualizar os dados. Tente novamente.");
             return null;
         }
     }
@@ -258,22 +284,31 @@ function createProvaCard(prova) {
 }
 
 async function saveProva(formData) {
+    const id_prova = formData.get("id_prova");
     const data = {
-        id_prova: formData.get('id_prova') || Date.now(),
-        titulo: formData.get('titulo'),
-        data_inicio: formData.get('data_inicio'),
-        data_fim: formData.get('data_fim'),
-        duracao_minutos: parseInt(formData.get('duracao_minutos')),
-        nota_maxima: parseFloat(formData.get('nota_maxima'))
+        id_prova: id_prova || Date.now(),
+        titulo: formData.get("titulo"),
+        data_inicio: formData.get("data_inicio"),
+        data_fim: formData.get("data_fim"),
+        duracao_minutos: parseInt(formData.get("duracao_minutos")),
+        nota_maxima: parseFloat(formData.get("nota_maxima"))
     };
-    
-    const result = await apiRequest('prova', 'POST', data);
+
+    let result;
+    if (id_prova) {
+        // If id_prova exists, it's an update
+        result = await apiRequest("prova", "PUT", data);
+    } else {
+        // Otherwise, it's a new entry
+        result = await apiRequest("prova", "POST", data);
+    }
+
     if (result && result.success) {
         hideProvaForm();
         loadProvas();
-        showAlert('Sucesso', 'Prova salva com sucesso!');
+        showAlert("Sucesso", "Prova salva com sucesso!");
     } else {
-        showAlert('Erro', 'Erro ao salvar prova.');
+        showAlert("Erro", "Erro ao salvar prova.");
     }
 }
 
@@ -381,27 +416,48 @@ function createQuestaoCard(questao) {
 }
 
 async function saveQuestao(formData) {
+    const id_questao = formData.get("id_questao");
+    const tipo = formData.get("tipo");
     const data = {
-        id_questao: formData.get('id_questao') || Date.now(),
-        id_prova: formData.get('id_prova'),
-        tipo: formData.get('tipo'),
-        enunciado: formData.get('enunciado'),
-        opcao_a: formData.get('opcao_a') || '',
-        opcao_b: formData.get('opcao_b') || '',
-        opcao_c: formData.get('opcao_c') || '',
-        opcao_d: formData.get('opcao_d') || '',
-        opcao_e: formData.get('opcao_e') || '',
-        resposta_correta: formData.get('resposta_correta') || '',
-        peso: parseFloat(formData.get('peso'))
+        id_questao: id_questao || Date.now(),
+        id_prova: formData.get("id_prova"),
+        tipo: tipo,
+        enunciado: formData.get("enunciado"),
+        peso: parseFloat(formData.get("peso"))
     };
-    
-    const result = await apiRequest('questao', 'POST', data);
+
+    // Clear objective options if the question type is discursive
+    if (tipo === "objetiva") {
+        data.opcao_a = formData.get("opcao_a") || "";
+        data.opcao_b = formData.get("opcao_b") || "";
+        data.opcao_c = formData.get("opcao_c") || "";
+        data.opcao_d = formData.get("opcao_d") || "";
+        data.opcao_e = formData.get("opcao_e") || "";
+        data.resposta_correta = formData.get("resposta_correta") || "";
+    } else {
+        data.opcao_a = "";
+        data.opcao_b = "";
+        data.opcao_c = "";
+        data.opcao_d = "";
+        data.opcao_e = "";
+        data.resposta_correta = "";
+    }
+
+    let result;
+    if (id_questao) {
+        // If id_questao exists, it's an update
+        result = await apiRequest("questao", "PUT", data);
+    } else {
+        // Otherwise, it's a new entry
+        result = await apiRequest("questao", "POST", data);
+    }
+
     if (result && result.success) {
         hideQuestaoForm();
         loadQuestoes(data.id_prova);
-        showAlert('Sucesso', 'Questão salva com sucesso!');
+        showAlert("Sucesso", "Questão salva com sucesso!");
     } else {
-        showAlert('Erro', 'Erro ao salvar questão.');
+        showAlert("Erro", "Erro ao salvar questão.");
     }
 }
 
@@ -614,13 +670,23 @@ async function startExam(studentData) {
 }
 
 async function getUserIP() {
-    try {
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        return data.ip;
-    } catch (error) {
-        return 'unknown';
-    }
+    return new Promise((resolve) => {
+        const callbackName = 'jsonp_ip_callback_' + Math.round(100000 * Math.random());
+        window[callbackName] = function(data) {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            resolve(data.ip || 'unknown');
+        };
+
+        const script = document.createElement('script');
+        script.src = `https://api.ipify.org?format=jsonp&callback=${callbackName}`;
+        script.onerror = () => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            resolve('unknown');
+        };
+        document.body.appendChild(script);
+    });
 }
 
 async function loadExamQuestions() {
