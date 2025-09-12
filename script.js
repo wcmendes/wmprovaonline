@@ -620,52 +620,55 @@ async function startExam(studentData) {
         showAlert('Erro', 'Não há prova ativa no momento.');
         return;
     }
-    
-    // Check if student already has a response
-    const respostas = await apiRequest('resposta');
+
+    const respostas = await apiRequest("resposta");
+    let existingResponse = null;
+
     if (respostas && respostas.data) {
-        const existingResponse = respostas.data.find(r => 
+        existingResponse = respostas.data.find(r => 
             r.id_prova == activeExam.id_prova && r.cpf === studentData.cpf
         );
-        
-        if (existingResponse && existingResponse.hora_fim) {
-            showAlert('Erro', 'Você já finalizou esta prova.');
-            return;
-        }
-        
-        if (existingResponse) {
-            // Resume exam
-            currentExam = activeExam;
-            studentAnswers = JSON.parse(existingResponse.respostas || '{}');
-            examStartTime = new Date(existingResponse.hora_login);
-            await loadExamQuestions();
-            showExamScreen();
-            return;
-        }
     }
-    
-    // Create new response record
-    const responseData = {
-        id_resposta: Date.now(),
-        id_prova: activeExam.id_prova,
-        nome: studentData.nome,
-        email: studentData.email,
-        cpf: studentData.cpf,
-        ip: await getUserIP(),
-        hora_login: new Date().toISOString(),
-        respostas: '{}',
-        tentativas_de_sair: 0
-    };
-    
-    const result = await apiRequest('resposta', 'POST', responseData);
-    if (result && result.success) {
-        currentExam = activeExam;
-        examStartTime = new Date();
-        studentAnswers = {};
+
+    if (existingResponse && existingResponse.hora_fim) {
+        showAlert("Erro", "Você já finalizou esta prova.");
+        return;
+    }
+
+    currentExam = activeExam;
+
+    if (existingResponse) {
+        // Resume exam
+        currentExam.id_resposta = existingResponse.id_resposta;
+        studentAnswers = JSON.parse(existingResponse.respostas || "{}");
+        examStartTime = new Date(existingResponse.hora_login);
+        // No need to send data back, just proceed
         await loadExamQuestions();
         showExamScreen();
     } else {
-        showAlert('Erro', 'Erro ao iniciar prova.');
+        // Create new response record
+        const newResponseData = {
+            id_resposta: Date.now(),
+            id_prova: activeExam.id_prova,
+            nome: studentData.nome,
+            email: studentData.email,
+            cpf: studentData.cpf,
+            ip: await getUserIP(),
+            hora_login: new Date().toISOString(),
+            respostas: "{}",
+            tentativas_de_sair: 0
+        };
+
+        const result = await apiRequest("resposta", "POST", newResponseData);
+        if (result && result.success) {
+            currentExam.id_resposta = newResponseData.id_resposta;
+            examStartTime = new Date();
+            studentAnswers = {};
+            await loadExamQuestions();
+            showExamScreen();
+        } else {
+            showAlert("Erro", "Erro ao iniciar prova.");
+        }
     }
 }
 
@@ -769,25 +772,19 @@ function enableExamMode() {
     document.body.classList.add('exam-mode');
     
     // Request fullscreen
-    const requestFullscreen = document.documentElement.requestFullscreen ||
-                              document.documentElement.mozRequestFullScreen || // Firefox
-                              document.documentElement.webkitRequestFullscreen || // Chrome, Safari and Opera
-                              document.documentElement.msRequestFullscreen; // IE/Edge
-
-    if (requestFullscreen) {
-        requestFullscreen.call(document.documentElement).catch(err => {
-            console.warn("Failed to enter fullscreen:", err);
-            showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
-        });
-    } else {
-        showAlert("Aviso", "Seu navegador não suporta o modo tela cheia. A prova pode não funcionar como esperado.");
+    try {
+        await document.documentElement.requestFullscreen();
+    } catch (err) {
+        console.warn("Failed to enter fullscreen:", err);
+        showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
     }
     
     // Add event listeners for security
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('contextmenu', handleContextMenu);
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener(\'visibilitychange\', handleVisibilityChange);
+    document.addEventListener(\'fullscreenchange\', handleFullscreenChange);
+    document.addEventListener(\'keydown\', handleKeyDown);
+    document.addEventListener(\'contextmenu\', handleContextMenu);
+    window.addEventListener(\'beforeunload\', handleBeforeUnload);
 }
 
 function disableExamMode() {
@@ -882,7 +879,7 @@ async function finishExam(autoFinish = false) {
     if (examTimer) {
         clearInterval(examTimer);
     }
-    
+
     // Calculate objective score
     let objectiveScore = 0;
     examQuestions.forEach(question => {
@@ -890,25 +887,26 @@ async function finishExam(autoFinish = false) {
             objectiveScore += parseFloat(question.peso);
         }
     });
-    
+
     // Update response
     const updateData = {
+        id_resposta: currentExam.id_resposta, // Use the stored id_resposta
         respostas: JSON.stringify(studentAnswers),
         hora_fim: new Date().toISOString(),
         nota_objetiva: objectiveScore,
         tentativas_de_sair: exitAttempts
     };
-    
-    const result = await apiRequest('resposta', 'POST', updateData);
-    
+
+    const result = await apiRequest('resposta', 'PUT', updateData);
+
     disableExamMode();
-    
+
     if (autoFinish) {
         document.getElementById('resultMessage').textContent = 'Seu tempo de prova expirou. Você não pode mais responder.';
     } else {
         document.getElementById('resultMessage').textContent = 'Prova finalizada com sucesso!';
     }
-    
+
     showScreen('resultScreen');
 }
 
@@ -1574,4 +1572,18 @@ document.head.appendChild(accessibilityStyle);
 
 // Override the global apiRequest function for local testing
 
+
+
+
+function handleFullscreenChange() {
+    if (!document.fullscreenElement && isExamMode) {
+        exitAttempts++;
+        showAlert("Aviso", "Você saiu do modo tela cheia. Evento registrado pelo WM Prova Online. Tentando retornar ao modo tela cheia...");
+        try {
+            document.documentElement.requestFullscreen();
+        } catch (err) {
+            console.warn("Failed to re-enter fullscreen:", err);
+        }
+    }
+}
 
