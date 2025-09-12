@@ -769,8 +769,18 @@ function enableExamMode() {
     document.body.classList.add('exam-mode');
     
     // Request fullscreen
-    if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
+    const requestFullscreen = document.documentElement.requestFullscreen ||
+                              document.documentElement.mozRequestFullScreen || // Firefox
+                              document.documentElement.webkitRequestFullscreen || // Chrome, Safari and Opera
+                              document.documentElement.msRequestFullscreen; // IE/Edge
+
+    if (requestFullscreen) {
+        requestFullscreen.call(document.documentElement).catch(err => {
+            console.warn("Failed to enter fullscreen:", err);
+            showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
+        });
+    } else {
+        showAlert("Aviso", "Seu navegador não suporta o modo tela cheia. A prova pode não funcionar como esperado.");
     }
     
     // Add event listeners for security
@@ -807,7 +817,8 @@ function handleKeyDown(event) {
     if (isExamMode) {
         // Block copy/paste and other shortcuts
         if (event.ctrlKey && (event.key === 'c' || event.key === 'v' || event.key === 'x' || 
-                              event.key === 'u' || event.key === 'i' || event.key === 's')) {
+                              event.key === 'u' || event.key === 'i' || event.key === 's' || 
+                              (event.shiftKey && event.key === 'V'))) {
             event.preventDefault();
             showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
         }
