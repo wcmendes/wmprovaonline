@@ -483,15 +483,22 @@ function showQuestaoForm(questao = null) {
         form.opcao_d.value = questao.opcao_d || '';
         form.opcao_e.value = questao.opcao_e || '';
         form.resposta_correta.value = questao.resposta_correta || '';
-        form.peso.value = questao.peso;
         
-        toggleOpcoesObjetivas(questao.tipo === 'objetiva');
+        // Show/hide objective options based on question type
+        if (questao.tipo === 'objetiva') {
+            document.getElementById('objectiveOptions').style.display = 'block';
+            document.getElementById('correctAnswer').style.display = 'block';
+        } else {
+            document.getElementById('objectiveOptions').style.display = 'none';
+            document.getElementById('correctAnswer').style.display = 'none';
+        }
     } else {
         title.textContent = 'Nova Questão';
         form.reset();
         form.id_questao.value = '';
         form.id_prova.value = provaId;
-        toggleOpcoesObjetivas(true);
+        document.getElementById('objectiveOptions').style.display = 'none';
+        document.getElementById('correctAnswer').style.display = 'none';
     }
     
     document.getElementById('questaoForm').style.display = 'flex';
@@ -499,11 +506,6 @@ function showQuestaoForm(questao = null) {
 
 function hideQuestaoForm() {
     document.getElementById('questaoForm').style.display = 'none';
-}
-
-function toggleOpcoesObjetivas(show) {
-    const opcoesDiv = document.getElementById('opcoesObjetivas');
-    opcoesDiv.style.display = show ? 'block' : 'none';
 }
 
 async function editQuestao(id) {
@@ -521,8 +523,7 @@ async function deleteQuestao(id) {
         if (confirmed) {
             const result = await apiRequest('questao', 'POST', { id_questao: id, action: 'delete' });
             if (result && result.success) {
-                const provaId = document.getElementById('provaSelectQuestoes').value;
-                loadQuestoes(provaId);
+                loadQuestoes(document.getElementById('provaSelectQuestoes').value);
                 showAlert('Sucesso', 'Questão excluída com sucesso!');
             } else {
                 showAlert('Erro', 'Erro ao excluir questão.');
@@ -531,93 +532,11 @@ async function deleteQuestao(id) {
     });
 }
 
-// Responses Management
-async function loadRespostas(provaId) {
-    if (!provaId) {
-        document.getElementById('respostasList').innerHTML = '';
-        return;
-    }
-    
-    const respostas = await apiRequest('resposta');
-    if (!respostas || !respostas.data) return;
-    
-    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
-    const respostasList = document.getElementById('respostasList');
-    respostasList.innerHTML = '';
-    
-    provaRespostas.forEach(resposta => {
-        const respostaCard = createRespostaCard(resposta);
-        respostasList.appendChild(respostaCard);
-    });
-}
-
-function createRespostaCard(resposta) {
-    const card = document.createElement('div');
-    card.className = 'item-card';
-    
-    const notaFinal = (resposta.nota_objetiva || 0) + (resposta.nota_discursiva || 0);
-    
-    card.innerHTML = `
-        <div class="item-header">
-            <h4 class="item-title">${resposta.nome}</h4>
-            <div class="item-actions">
-                <button class="btn btn-primary" onclick="viewRespostas(${resposta.id_resposta})">Ver Respostas</button>
-                <button class="btn btn-secondary" onclick="editNotaDiscursiva(${resposta.id_resposta})">Nota Discursiva</button>
-            </div>
-        </div>
-        <div class="item-details">
-            <div class="item-detail">
-                <strong>Email:</strong>
-                <span>${resposta.email}</span>
-            </div>
-            <div class="item-detail">
-                <strong>CPF:</strong>
-                <span>${formatCPF(resposta.cpf)}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Objetiva:</strong>
-                <span>${resposta.nota_objetiva || 0}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Discursiva:</strong>
-                <span>${resposta.nota_discursiva || 0}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Final:</strong>
-                <span style="font-weight: bold; color: #667eea;">${notaFinal}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Tentativas de Sair:</strong>
-                <span>${resposta.tentativas_de_sair || 0}</span>
-            </div>
-        </div>
-    `;
-    
-    return card;
-}
-
-// Student Functions
-async function checkActiveExam() {
-    const provas = await apiRequest('prova');
-    if (!provas || !provas.data) {
-        showAlert('Erro', 'Não foi possível verificar provas ativas.');
-        return null;
-    }
-    
-    const now = new Date();
-    const activeExam = provas.data.find(prova => {
-        const startDate = new Date(prova.data_inicio);
-        const endDate = new Date(prova.data_fim);
-        return now >= startDate && now <= endDate;
-    });
-    
-    return activeExam;
-}
-
+// Student Exam Functions
 async function startExam(studentData) {
     const activeExam = await checkActiveExam();
     if (!activeExam) {
-        showAlert('Erro', 'Não há prova ativa no momento.');
+        showAlert(\'Erro\', \'Não há prova ativa no momento.\');
         return;
     }
 
@@ -674,173 +593,95 @@ async function startExam(studentData) {
 
 async function getUserIP() {
     return new Promise((resolve) => {
-        const callbackName = 'jsonp_ip_callback_' + Math.round(100000 * Math.random());
-        window[callbackName] = function(data) {
-            delete window[callbackName];
-            document.body.removeChild(script);
-            resolve(data.ip || 'unknown');
-        };
-
-        const script = document.createElement('script');
-        script.src = `https://api.ipify.org?format=jsonp&callback=${callbackName}`;
-        script.onerror = () => {
-            delete window[callbackName];
-            document.body.removeChild(script);
-            resolve('unknown');
-        };
-        document.body.appendChild(script);
+        fetch('https://api.ipify.org?format=json')
+            .then(response => response.json())
+            .then(data => resolve(data.ip))
+            .catch(() => resolve('unknown'));
     });
 }
 
-async function loadExamQuestions() {
-    const questoes = await apiRequest('questao');
-    if (!questoes || !questoes.data) return;
-    
-    examQuestions = questoes.data.filter(q => q.id_prova == currentExam.id_prova);
-    examDuration = currentExam.duracao_minutos * 60; // Convert to seconds
-    
-    renderExamQuestions();
-    startExamTimer();
+async function checkActiveExam() {
+    const provas = await apiRequest('prova');
+    if (!provas || !provas.data) return null;
+
+    const now = new Date();
+    const active = provas.data.find(prova => {
+        const startDate = new Date(prova.data_inicio);
+        const endDate = new Date(prova.data_fim);
+        return now >= startDate && now <= endDate;
+    });
+    return active;
 }
 
-function renderExamQuestions() {
-    const questionsContainer = document.getElementById('examQuestions');
-    questionsContainer.innerHTML = '';
-    
+function loadExamQuestions() {
+    const examQuestionsList = document.getElementById('examQuestionsList');
+    examQuestionsList.innerHTML = '';
+
     examQuestions.forEach((question, index) => {
-        const questionCard = createExamQuestionCard(question, index + 1);
-        questionsContainer.appendChild(questionCard);
-    });
-}
+        const questionElement = document.createElement('div');
+        questionElement.className = 'exam-question-card';
+        questionElement.innerHTML = `
+            <h4>Questão ${index + 1} (${question.tipo === 'objetiva' ? 'Objetiva' : 'Discursiva'}) - Peso: ${question.peso}</h4>
+            <p>${question.enunciado}</p>
+            ${question.tipo === 'objetiva' ? `
+                <div class="options">
+                    <label><input type="radio" name="question_${question.id_questao}" value="A"> A) ${question.opcao_a}</label>
+                    <label><input type="radio" name="question_${question.id_questao}" value="B"> B) ${question.opcao_b}</label>
+                    <label><input type="radio" name="question_${question.id_questao}" value="C"> C) ${question.opcao_c}</label>
+                    <label><input type="radio" name="question_${question.id_questao}" value="D"> D) ${question.opcao_d}</label>
+                    <label><input type="radio" name="question_${question.id_questao}" value="E"> E) ${question.opcao_e}</label>
+                </div>
+            ` : `
+                <textarea name="question_${question.id_questao}" rows="5" placeholder="Sua resposta..."></textarea>
+            `}
+        `;
+        examQuestionsList.appendChild(questionElement);
 
-function createExamQuestionCard(question, number) {
-    const card = document.createElement('div');
-    card.className = 'question-card';
-    
-    let optionsHtml = '';
-    if (question.tipo === 'objetiva') {
-        const options = ['A', 'B', 'C', 'D', 'E'];
-        optionsHtml = '<div class="question-options">';
-        
-        options.forEach(option => {
-            const optionText = question[`opcao_${option.toLowerCase()}`];
-            if (optionText) {
-                const isChecked = studentAnswers[question.id_questao] === option ? 'checked' : '';
-                optionsHtml += `
-                    <div class="option-item">
-                        <input type="radio" name="question_${question.id_questao}" value="${option}" ${isChecked} 
-                               onchange="saveAnswer(${question.id_questao}, '${option}')">
-                        <span class="option-text">${option}) ${optionText}</span>
-                    </div>
-                `;
+        // Restore previous answer if exists
+        if (studentAnswers[question.id_questao]) {
+            if (question.tipo === 'objetiva') {
+                const radio = questionElement.querySelector(`input[value="${studentAnswers[question.id_questao]}"]`);
+                if (radio) radio.checked = true;
+            } else {
+                const textarea = questionElement.querySelector('textarea');
+                if (textarea) textarea.value = studentAnswers[question.id_questao];
+            }
+        }
+
+        // Add event listener to save answer on change
+        questionElement.addEventListener('change', (event) => {
+            const target = event.target;
+            const questionId = question.id_questao;
+            if (target.type === 'radio' || target.tagName === 'TEXTAREA') {
+                studentAnswers[questionId] = target.value;
             }
         });
-        
-        optionsHtml += '</div>';
-    } else {
-        const savedAnswer = studentAnswers[question.id_questao] || '';
-        optionsHtml = `
-            <textarea class="question-textarea" placeholder="Digite sua resposta aqui..." 
-                      onchange="saveAnswer(${question.id_questao}, this.value)">${savedAnswer}</textarea>
-        `;
+    });
+}
+
+function updateExamTimerDisplay() {
+    const timerElement = document.getElementById('timer');
+    const now = Date.now();
+    const elapsed = now - examStartTime.getTime();
+    const remaining = examDuration * 60 * 1000 - elapsed;
+
+    if (remaining <= 0) {
+        clearInterval(examTimer);
+        finishExam(true); // Auto-finish
+        return;
     }
-    
-    card.innerHTML = `
-        <div class="question-header">
-            <span class="question-number">Questão ${number}</span>
-            <span class="question-type">${question.tipo}</span>
-        </div>
-        <div class="question-text">${question.enunciado}</div>
-        ${optionsHtml}
-    `;
-    
-    return card;
-}
 
-function saveAnswer(questionId, answer) {
-    studentAnswers[questionId] = answer;
-}
+    const hours = Math.floor(remaining / (1000 * 60 * 60));
+    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
 
-function showExamScreen() {
-    document.getElementById('examTitle').textContent = currentExam.titulo;
-    showScreen('examScreen');
-    enableExamMode();
-}
+    timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-function enableExamMode() {
-    isExamMode = true;
-    document.body.classList.add('exam-mode');
-    
-    // Request fullscreen
-    try {
-        await document.documentElement.requestFullscreen();
-    } catch (err) {
-        console.warn("Failed to enter fullscreen:", err);
-        showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
-    }
-    
-    // Add event listeners for security
-    document.addEventListener(\'visibilitychange\', handleVisibilityChange);
-    document.addEventListener(\'fullscreenchange\', handleFullscreenChange);
-    document.addEventListener(\'keydown\', handleKeyDown);
-    document.addEventListener(\'contextmenu\', handleContextMenu);
-    window.addEventListener(\'beforeunload\', handleBeforeUnload);
-}
-
-function disableExamMode() {
-    isExamMode = false;
-    document.body.classList.remove('exam-mode');
-    
-    // Exit fullscreen
-    if (document.exitFullscreen) {
-        document.exitFullscreen();
-    }
-    
-    // Remove event listeners
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('contextmenu', handleContextMenu);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-}
-
-function handleVisibilityChange() {
-    if (isExamMode && document.hidden) {
-        exitAttempts++;
-        showAlert('Aviso', 'Tentativa de sair da janela registrada. Mantenha-se na prova.');
-    }
-}
-
-function handleKeyDown(event) {
-    if (isExamMode) {
-        // Block copy/paste and other shortcuts
-        if (event.ctrlKey && (event.key === 'c' || event.key === 'v' || event.key === 'x' || 
-                              event.key === 'u' || event.key === 'i' || event.key === 's' || 
-                              (event.shiftKey && event.key === 'V'))) {
-            event.preventDefault();
-            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
-        }
-        
-        // Block F12, F5, etc.
-        if (event.key === 'F12' || event.key === 'F5' || 
-            (event.ctrlKey && event.shiftKey && event.key === 'I')) {
-            event.preventDefault();
-            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
-        }
-    }
-}
-
-function handleContextMenu(event) {
-    if (isExamMode) {
-        event.preventDefault();
-        showAlert('Bloqueado', 'Menu de contexto não é permitido durante a prova.');
-    }
-}
-
-function handleBeforeUnload(event) {
-    if (isExamMode) {
-        event.preventDefault();
-        event.returnValue = '';
-        return '';
+    // Change color when time is running out
+    if (remaining < 300000) { // 5 minutes
+        timerElement.style.color = '#dc3545';
+    } else if (remaining < 600000) { // 10 minutes
+        timerElement.style.color = '#ffc107';
     }
 }
 
@@ -908,6 +749,100 @@ async function finishExam(autoFinish = false) {
     }
 
     showScreen('resultScreen');
+}
+
+async function enableExamMode() {
+    isExamMode = true;
+    document.body.classList.add(\'exam-mode\');
+    
+    // Request fullscreen
+    try {
+        await document.documentElement.requestFullscreen();
+    } catch (err) {
+        console.warn("Failed to enter fullscreen:", err);
+        showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
+    }
+    
+    // Add event listeners for security
+    document.addEventListener(\'visibilitychange\', handleVisibilityChange);
+    document.addEventListener(\'fullscreenchange\', handleFullscreenChange);
+    document.addEventListener(\'keydown\', handleKeyDown);
+    document.addEventListener(\'contextmenu\', handleContextMenu);
+    window.addEventListener(\'beforeunload\', handleBeforeUnload);
+}
+
+function disableExamMode() {
+    isExamMode = false;
+    document.body.classList.remove('exam-mode');
+    
+    // Exit fullscreen
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    }
+    
+    // Remove event listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('contextmenu', handleContextMenu);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+}
+
+function handleVisibilityChange() {
+    if (isExamMode && document.hidden) {
+        exitAttempts++;
+        showAlert('Aviso', 'Tentativa de sair da janela registrada. Mantenha-se na prova.');
+    }
+}
+
+function handleKeyDown(event) {
+    if (isExamMode) {
+        // Block common cheating attempts
+        if (event.key === 'Tab' || 
+            (event.ctrlKey && event.key === 'c') || 
+            (event.ctrlKey && event.key === 'v') || 
+            (event.ctrlKey && event.key === 'a') || 
+            (event.ctrlKey && event.key === 'x') ||
+            (event.ctrlKey && event.shiftKey && event.key === 'V') // Block CTRL+SHIFT+V
+        ) {
+            event.preventDefault();
+            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
+        }
+        
+        // Block F12, F5, etc.
+        if (event.key === 'F12' || event.key === 'F5' || 
+            (event.ctrlKey && event.shiftKey && event.key === 'I')) {
+            event.preventDefault();
+            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
+        }
+    }
+}
+
+function handleContextMenu(event) {
+    if (isExamMode) {
+        event.preventDefault();
+        showAlert('Bloqueado', 'Menu de contexto não é permitido durante a prova.');
+    }
+}
+
+function handleBeforeUnload(event) {
+    if (isExamMode) {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+    }
+}
+
+function handleFullscreenChange() {
+    if (!document.fullscreenElement && isExamMode) {
+        exitAttempts++;
+        showAlert("Aviso", "Você saiu do modo tela cheia. Evento registrado pelo WM Prova Online. Tentando retornar ao modo tela cheia...");
+        try {
+            document.documentElement.requestFullscreen();
+        } catch (err) {
+            console.warn("Failed to re-enter fullscreen:", err);
+        }
+    }
 }
 
 // Event Listeners
@@ -999,11 +934,9 @@ document.addEventListener('DOMContentLoaded', function() {
         await saveProva(formData);
     });
     
-    // Questao form
+    // Questoes tab
     document.getElementById('provaSelectQuestoes').addEventListener('change', (e) => {
-        const provaId = e.target.value;
-        document.getElementById('addQuestaoBtn').disabled = !provaId;
-        loadQuestoes(provaId);
+        loadQuestoes(e.target.value);
     });
     
     document.getElementById('addQuestaoBtn').addEventListener('click', () => {
@@ -1014,576 +947,32 @@ document.addEventListener('DOMContentLoaded', function() {
         hideQuestaoForm();
     });
     
-    document.getElementById('questaoTipo').addEventListener('change', (e) => {
-        toggleOpcoesObjetivas(e.target.value === 'objetiva');
-    });
-    
     document.getElementById('questaoFormElement').addEventListener('submit', async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         await saveQuestao(formData);
     });
     
-    // Respostas
+    document.getElementById('questaoTipo').addEventListener('change', (e) => {
+        if (e.target.value === 'objetiva') {
+            document.getElementById('objectiveOptions').style.display = 'block';
+            document.getElementById('correctAnswer').style.display = 'block';
+        } else {
+            document.getElementById('objectiveOptions').style.display = 'none';
+            document.getElementById('correctAnswer').style.display = 'none';
+        }
+    });
+
+    // Respostas tab
     document.getElementById('provaSelectRespostas').addEventListener('change', (e) => {
         loadRespostas(e.target.value);
     });
-    
-    // Exam
-    document.getElementById('submitExamBtn').addEventListener('click', () => {
-        showConfirm('Finalizar Prova', 'Tem certeza que deseja finalizar a prova?', (confirmed) => {
-            if (confirmed) {
-                finishExam();
-            }
-        });
-    });
-    
-    // Modal close buttons
-    document.getElementById('alertOkBtn').addEventListener('click', hideAlert);
-    
-    // CPF formatting
-    document.getElementById('studentCPF').addEventListener('input', (e) => {
-        let value = e.target.value.replace(/[^\d]/g, '');
-        if (value.length <= 11) {
-            value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-            e.target.value = value;
-        }
-    });
+
+    // Initial screen setup
+    showScreen('homeScreen');
 });
 
-// Global functions for HTML onclick events
-window.editProva = editProva;
-window.deleteProva = deleteProva;
-window.editQuestao = editQuestao;
-window.deleteQuestao = deleteQuestao;
-window.saveAnswer = saveAnswer;
+// Initial setup
+showScreen('homeScreen');
 
-
-
-// Additional functions for viewing responses and editing discursive grades
-async function viewRespostas(respostaId) {
-    const respostas = await apiRequest('resposta');
-    if (!respostas || !respostas.data) return;
-    
-    const resposta = respostas.data.find(r => r.id_resposta == respostaId);
-    if (!resposta) return;
-    
-    const questoes = await apiRequest('questao');
-    if (!questoes || !questoes.data) return;
-    
-    const provaQuestoes = questoes.data.filter(q => q.id_prova == resposta.id_prova);
-    const respostasData = JSON.parse(resposta.respostas || '{}');
-    
-    let modalContent = `
-        <div class="form-modal" style="display: flex;">
-            <div class="form-card" style="max-width: 800px;">
-                <h3>Respostas de ${resposta.nome}</h3>
-                <div style="max-height: 70vh; overflow-y: auto;">
-    `;
-    
-    provaQuestoes.forEach((questao, index) => {
-        const respAluno = respostasData[questao.id_questao] || 'Não respondida';
-        modalContent += `
-            <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
-                <h4>Questão ${index + 1} (${questao.tipo})</h4>
-                <p><strong>Enunciado:</strong> ${questao.enunciado}</p>
-                <p><strong>Resposta do aluno:</strong> ${respAluno}</p>
-                ${questao.tipo === 'objetiva' ? `<p><strong>Resposta correta:</strong> ${questao.resposta_correta}</p>` : ''}
-                <p><strong>Peso:</strong> ${questao.peso}</p>
-            </div>
-        `;
-    });
-    
-    modalContent += `
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-secondary" onclick="closeViewRespostas()">Fechar</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalContent);
-}
-
-function closeViewRespostas() {
-    const modal = document.querySelector('.form-modal:last-child');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-async function editNotaDiscursiva(respostaId) {
-    const respostas = await apiRequest('resposta');
-    if (!respostas || !respostas.data) return;
-    
-    const resposta = respostas.data.find(r => r.id_resposta == respostaId);
-    if (!resposta) return;
-    
-    const notaAtual = resposta.nota_discursiva || 0;
-    
-    const modalContent = `
-        <div class="form-modal" style="display: flex;">
-            <div class="form-card">
-                <h3>Editar Nota Discursiva</h3>
-                <p><strong>Aluno:</strong> ${resposta.nome}</p>
-                <p><strong>Nota Objetiva:</strong> ${resposta.nota_objetiva || 0}</p>
-                <form id="notaDiscursivaForm">
-                    <div class="form-group">
-                        <label for="notaDiscursiva">Nota Discursiva:</label>
-                        <input type="number" id="notaDiscursiva" step="0.1" value="${notaAtual}" required>
-                    </div>
-                    <div class="button-group">
-                        <button type="submit" class="btn btn-primary">Salvar</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeNotaDiscursiva()">Cancelar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', modalContent);
-    
-    document.getElementById('notaDiscursivaForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const nota = parseFloat(document.getElementById('notaDiscursiva').value);
-        
-        const updateData = {
-            id_resposta: respostaId,
-            nota_discursiva: nota,
-            nota_final: (resposta.nota_objetiva || 0) + nota
-        };
-        
-        const result = await apiRequest('resposta', 'POST', updateData);
-        if (result && result.success) {
-            closeNotaDiscursiva();
-            const provaId = document.getElementById('provaSelectRespostas').value;
-            loadRespostas(provaId);
-            showAlert('Sucesso', 'Nota discursiva salva com sucesso!');
-        } else {
-            showAlert('Erro', 'Erro ao salvar nota discursiva.');
-        }
-    });
-}
-
-function closeNotaDiscursiva() {
-    const modal = document.querySelector('.form-modal:last-child');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-// Enhanced API request function with better error handling
-async function apiRequestEnhanced(tabela, method = 'GET', data = null) {
-    try {
-        showLoading();
-        
-        const url = new URL(API_BASE);
-        url.searchParams.append('tabela', tabela);
-        url.searchParams.append('key', API_KEY);
-        
-        const options = {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            mode: 'cors'
-        };
-        
-        if (data && method === 'POST') {
-            options.body = JSON.stringify(data);
-        }
-        
-        const response = await fetch(url.toString(), options);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const result = await response.json();
-        hideLoading();
-        
-        return result;
-    } catch (error) {
-        hideLoading();
-        console.error('API Error:', error);
-        
-        // Show more specific error messages
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            showAlert('Erro de Conexão', 'Não foi possível conectar ao servidor. Verifique sua conexão com a internet.');
-        } else if (error.message.includes('HTTP error')) {
-            showAlert('Erro do Servidor', 'O servidor retornou um erro. Tente novamente em alguns minutos.');
-        } else {
-            showAlert('Erro', 'Erro inesperado. Tente novamente.');
-        }
-        
-        return null;
-    }
-}
-
-
-
-
-
-// Add global functions for HTML onclick events
-window.viewRespostas = viewRespostas;
-window.editNotaDiscursiva = editNotaDiscursiva;
-window.closeViewRespostas = closeViewRespostas;
-window.closeNotaDiscursiva = closeNotaDiscursiva;
-
-
-// Additional UI/UX enhancements and security improvements
-
-// Auto-save student answers periodically
-let autoSaveInterval = null;
-
-function startAutoSave() {
-    if (autoSaveInterval) {
-        clearInterval(autoSaveInterval);
-    }
-    
-    autoSaveInterval = setInterval(async () => {
-        if (isExamMode && Object.keys(studentAnswers).length > 0) {
-            try {
-                const updateData = {
-                    respostas: JSON.stringify(studentAnswers),
-                    tentativas_de_sair: exitAttempts
-                };
-                
-                // Silent save without showing loading
-                await fetch(API_BASE + '?tabela=resposta&key=' + API_KEY, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updateData)
-                });
-            } catch (error) {
-                console.log('Auto-save failed:', error);
-            }
-        }
-    }, 30000); // Auto-save every 30 seconds
-}
-
-function stopAutoSave() {
-    if (autoSaveInterval) {
-        clearInterval(autoSaveInterval);
-        autoSaveInterval = null;
-    }
-}
-
-// Enhanced exam mode with additional security
-function enhancedExamMode() {
-    // Disable text selection
-    document.body.style.userSelect = 'none';
-    document.body.style.webkitUserSelect = 'none';
-    document.body.style.mozUserSelect = 'none';
-    document.body.style.msUserSelect = 'none';
-    
-    // Disable drag and drop
-    document.addEventListener('dragstart', preventDefaultAction);
-    document.addEventListener('drop', preventDefaultAction);
-    document.addEventListener('dragover', preventDefaultAction);
-    
-    // Disable print
-    window.addEventListener('beforeprint', preventDefaultAction);
-    
-    // Monitor focus changes
-    window.addEventListener('blur', handleWindowBlur);
-    window.addEventListener('focus', handleWindowFocus);
-    
-    // Start auto-save
-    startAutoSave();
-}
-
-function disableEnhancedExamMode() {
-    // Re-enable text selection
-    document.body.style.userSelect = '';
-    document.body.style.webkitUserSelect = '';
-    document.body.style.mozUserSelect = '';
-    document.body.style.msUserSelect = '';
-    
-    // Remove event listeners
-    document.removeEventListener('dragstart', preventDefaultAction);
-    document.removeEventListener('drop', preventDefaultAction);
-    document.removeEventListener('dragover', preventDefaultAction);
-    window.removeEventListener('beforeprint', preventDefaultAction);
-    window.removeEventListener('blur', handleWindowBlur);
-    window.removeEventListener('focus', handleWindowFocus);
-    
-    // Stop auto-save
-    stopAutoSave();
-}
-
-function preventDefaultAction(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    return false;
-}
-
-function handleWindowBlur() {
-    if (isExamMode) {
-        exitAttempts++;
-        console.log('Window lost focus - attempt:', exitAttempts);
-    }
-}
-
-function handleWindowFocus() {
-    if (isExamMode && exitAttempts > 0) {
-        showAlert('Aviso', `Você saiu da janela ${exitAttempts} vez(es). Mantenha o foco na prova.`);
-    }
-}
-
-// Enhanced timer with visual warnings
-function enhancedTimer() {
-    const timerElement = document.getElementById('timer');
-    const startTime = examStartTime.getTime();
-    const duration = examDuration * 1000;
-    
-    examTimer = setInterval(() => {
-        const now = Date.now();
-        const elapsed = now - startTime;
-        const remaining = duration - elapsed;
-        
-        if (remaining <= 0) {
-            clearInterval(examTimer);
-            finishExam(true);
-            return;
-        }
-        
-        const hours = Math.floor(remaining / (1000 * 60 * 60));
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        
-        timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        // Enhanced visual warnings
-        if (remaining < 60000) { // 1 minute
-            timerElement.style.color = '#dc3545';
-            timerElement.style.animation = 'pulse 1s infinite';
-        } else if (remaining < 300000) { // 5 minutes
-            timerElement.style.color = '#dc3545';
-            timerElement.style.animation = 'none';
-        } else if (remaining < 600000) { // 10 minutes
-            timerElement.style.color = '#ffc107';
-            timerElement.style.animation = 'none';
-        } else {
-            timerElement.style.color = '#28a745';
-            timerElement.style.animation = 'none';
-        }
-    }, 1000);
-}
-
-// Add pulse animation to CSS
-function addPulseAnimation() {
-    const style = document.createElement('style');
-    style.textContent = `
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-    `;
-    document.head.appendChild(style);
-}
-
-// Progress indicator for exam
-function addProgressIndicator() {
-    const examContainer = document.querySelector('.exam-container');
-    if (!examContainer) return;
-    
-    const progressHtml = `
-        <div id="examProgress" style="margin-bottom: 1rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span>Progresso da Prova</span>
-                <span id="progressText">0%</span>
-            </div>
-            <div style="width: 100%; height: 8px; background: #e1e5e9; border-radius: 4px; overflow: hidden;">
-                <div id="progressBar" style="height: 100%; background: #667eea; width: 0%; transition: width 0.3s ease;"></div>
-            </div>
-        </div>
-    `;
-    
-    examContainer.insertAdjacentHTML('afterbegin', progressHtml);
-}
-
-function updateProgress() {
-    const totalQuestions = examQuestions.length;
-    const answeredQuestions = Object.keys(studentAnswers).length;
-    const progress = totalQuestions > 0 ? (answeredQuestions / totalQuestions) * 100 : 0;
-    
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    
-    if (progressBar && progressText) {
-        progressBar.style.width = progress + '%';
-        progressText.textContent = Math.round(progress) + '%';
-    }
-}
-
-// Enhanced save answer function with progress update
-function enhancedSaveAnswer(questionId, answer) {
-    studentAnswers[questionId] = answer;
-    updateProgress();
-}
-
-// Keyboard shortcuts for professor dashboard
-function addKeyboardShortcuts() {
-    document.addEventListener('keydown', (event) => {
-        if (!isExamMode && currentUser) {
-            // Ctrl+N for new exam
-            if (event.ctrlKey && event.key === 'n') {
-                event.preventDefault();
-                if (document.getElementById('professorDashboard').classList.contains('active')) {
-                    showProvaForm();
-                }
-            }
-            
-            // Ctrl+Q for new question
-            if (event.ctrlKey && event.key === 'q') {
-                event.preventDefault();
-                const provaId = document.getElementById('provaSelectQuestoes').value;
-                if (provaId) {
-                    showQuestaoForm();
-                }
-            }
-        }
-    });
-}
-
-// Enhanced form validation
-function enhanceFormValidation() {
-    // Real-time CPF validation
-    const cpfInput = document.getElementById('studentCPF');
-    if (cpfInput) {
-        cpfInput.addEventListener('blur', (e) => {
-            const cpf = e.target.value.replace(/[^\d]/g, '');
-            if (cpf.length > 0 && !validateCPF(cpf)) {
-                e.target.style.borderColor = '#dc3545';
-                e.target.setCustomValidity('CPF inválido');
-            } else {
-                e.target.style.borderColor = '#28a745';
-                e.target.setCustomValidity('');
-            }
-        });
-    }
-    
-    // Email validation
-    const emailInput = document.getElementById('studentEmail');
-    if (emailInput) {
-        emailInput.addEventListener('blur', (e) => {
-            const email = e.target.value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (email.length > 0 && !emailRegex.test(email)) {
-                e.target.style.borderColor = '#dc3545';
-                e.target.setCustomValidity('Email inválido');
-            } else {
-                e.target.style.borderColor = '#28a745';
-                e.target.setCustomValidity('');
-            }
-        });
-    }
-}
-
-// Initialize enhanced features
-function initializeEnhancements() {
-    addPulseAnimation();
-    addKeyboardShortcuts();
-    enhanceFormValidation();
-    
-    // Override existing functions with enhanced versions
-    window.saveAnswer = enhancedSaveAnswer;
-    window.startExamTimer = enhancedTimer;
-    
-    // Add progress indicator when exam starts
-    const originalShowExamScreen = showExamScreen;
-    window.showExamScreen = function() {
-        originalShowExamScreen();
-        setTimeout(() => {
-            addProgressIndicator();
-            updateProgress();
-        }, 100);
-    };
-    
-    // Enhanced exam mode
-    const originalEnableExamMode = enableExamMode;
-    window.enableExamMode = function() {
-        originalEnableExamMode();
-        enhancedExamMode();
-    };
-    
-    const originalDisableExamMode = disableExamMode;
-    window.disableExamMode = function() {
-        originalDisableExamMode();
-        disableEnhancedExamMode();
-    };
-}
-
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeEnhancements);
-} else {
-    initializeEnhancements();
-}
-
-// Add accessibility improvements
-function addAccessibilityFeatures() {
-    // Add ARIA labels
-    document.querySelectorAll('button').forEach(button => {
-        if (!button.getAttribute('aria-label') && button.textContent) {
-            button.setAttribute('aria-label', button.textContent.trim());
-        }
-    });
-    
-    // Add focus management
-    document.addEventListener('keydown', (event) => {
-        if (event.key === 'Tab') {
-            // Ensure focus is visible
-            document.body.classList.add('keyboard-navigation');
-        }
-    });
-    
-    document.addEventListener('mousedown', () => {
-        document.body.classList.remove('keyboard-navigation');
-    });
-}
-
-// Initialize accessibility features
-addAccessibilityFeatures();
-
-// Add CSS for keyboard navigation
-const accessibilityStyle = document.createElement('style');
-accessibilityStyle.textContent = `
-    .keyboard-navigation *:focus {
-        outline: 2px solid #667eea !important;
-        outline-offset: 2px !important;
-    }
-    
-    .keyboard-navigation .btn:focus {
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3) !important;
-    }
-`;
-document.head.appendChild(accessibilityStyle);
-
-
-// Local testing mode with mock data
-
-
-// Mock data for local testing
-
-
-// Override the global apiRequest function for local testing
-
-
-
-
-function handleFullscreenChange() {
-    if (!document.fullscreenElement && isExamMode) {
-        exitAttempts++;
-        showAlert("Aviso", "Você saiu do modo tela cheia. Evento registrado pelo WM Prova Online. Tentando retornar ao modo tela cheia...");
-        try {
-            document.documentElement.requestFullscreen();
-        } catch (err) {
-            console.warn("Failed to re-enter fullscreen:", err);
-        }
-    }
-}
 
