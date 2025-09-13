@@ -74,8 +74,13 @@ function validateCPF(cpf) {
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
+        screen.style.display = 'none'; // Ensure it's hidden
     });
-    document.getElementById(screenId).classList.add('active');
+    const targetScreen = document.getElementById(screenId);
+    if (targetScreen) {
+        targetScreen.classList.add('active');
+        targetScreen.style.display = 'flex'; // Or 'block' depending on your CSS
+    }
 }
 
 function showUserInfo(userName) {
@@ -536,7 +541,7 @@ async function deleteQuestao(id) {
 async function startExam(studentData) {
     const activeExam = await checkActiveExam();
     if (!activeExam) {
-        showAlert(\'Erro\', \'Não há prova ativa no momento.\');
+        showAlert('Erro', 'Não há prova ativa no momento.');
         return;
     }
 
@@ -753,7 +758,7 @@ async function finishExam(autoFinish = false) {
 
 async function enableExamMode() {
     isExamMode = true;
-    document.body.classList.add(\'exam-mode\');
+    document.body.classList.add('exam-mode');
     
     // Request fullscreen
     try {
@@ -764,11 +769,11 @@ async function enableExamMode() {
     }
     
     // Add event listeners for security
-    document.addEventListener(\'visibilitychange\', handleVisibilityChange);
-    document.addEventListener(\'fullscreenchange\', handleFullscreenChange);
-    document.addEventListener(\'keydown\', handleKeyDown);
-    document.addEventListener(\'contextmenu\', handleContextMenu);
-    window.addEventListener(\'beforeunload\', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('contextmenu', handleContextMenu);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 }
 
 function disableExamMode() {
@@ -972,7 +977,7 @@ document.addEventListener('DOMContentLoaded', function() {
     showScreen('homeScreen');
 });
 
-// Initial setup
-showScreen('homeScreen');
+// Initial setup (This line is redundant if called inside DOMContentLoaded)
+// showScreen('homeScreen');
 
 
