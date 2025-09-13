@@ -701,3 +701,104 @@ body {
     user-select: auto;
 }
 
+
+
+
+/* Fix for dashboard alignment */
+.dashboard {
+    max-width: 1200px; /* Or your preferred max-width */
+    margin: 0 auto; /* Center the dashboard */
+}
+
+
+
+
+
+/* Adjust dashboard width and centering */
+.dashboard {
+    max-width: 1200px; /* Adjust as needed */
+    margin: 0 auto; /* Center the dashboard */
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+/* Ensure tab content takes full width */
+.tab-content {
+    width: 100%;
+}
+
+/* Style for the responses table */
+.responses-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.responses-table th,
+.responses-table td {
+    border: 1px solid #e1e5e9;
+    padding: 0.75rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.responses-table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    color: #333;
+}
+
+.responses-table tbody tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.responses-table tbody tr:hover {
+    background-color: #e9ecef;
+}
+
+.responses-table pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.85rem;
+    background-color: #e9ecef;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+
+
+
+.professor-dashboard-container {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.professor-dashboard-content {
+    width: 90%; /* Adjust as needed */
+    max-width: 1200px; /* Max width for larger screens */
+}
+
+.tab-content {
+    width: 100%;
+}
+
+.responses-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.responses-table th, .responses-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+.responses-table th {
+    background-color: #f2f2f2;
+}
+
+

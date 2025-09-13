@@ -26,9 +26,11 @@ function hideLoading() {
 }
 
 function showAlert(title, message) {
-    document.getElementById('alertTitle').textContent = title;
-    document.getElementById('alertMessage').textContent = message;
-    document.getElementById('alertModal').style.display = 'flex';
+    document.getElementById(\'alertTitle\').textContent = title;
+    document.getElementById(\'alertMessage\').textContent = message;
+    document.getElementById(\'alertModal\').style.display = \'flex\';
+    // Ensure the button correctly closes the alert
+    document.getElementById(\'alertOkBtn\').onclick = () => { hideAlert(); };
 }
 
 function hideAlert() {
@@ -36,16 +38,16 @@ function hideAlert() {
 }
 
 function showConfirm(title, message, callback) {
-    document.getElementById('confirmTitle').textContent = title;
-    document.getElementById('confirmMessage').textContent = message;
-    document.getElementById('confirmModal').style.display = 'flex';
+    document.getElementById(\'confirmTitle\').textContent = title;
+    document.getElementById(\'confirmMessage\').textContent = message;
+    document.getElementById(\'confirmModal\').style.display = \'flex\';
     
-    document.getElementById('confirmYesBtn').onclick = () => {
+    document.getElementById(\'confirmYesBtn\').onclick = () => {
         hideConfirm();
         callback(true);
     };
     
-    document.getElementById('confirmNoBtn').onclick = () => {
+    document.getElementById(\'confirmNoBtn\').onclick = () => {
         hideConfirm();
         callback(false);
     };
@@ -366,27 +368,130 @@ async function deleteProva(id) {
     });
 }
 
-// Questions Management
-async function loadQuestoes(provaId) {
+// Quasync function loadRespostas(provaId) {
     if (!provaId) {
-        document.getElementById('questoesList').innerHTML = '';
+        document.getElementById(\'respostasList\').innerHTML = \'\';
         return;
     }
     
-    const questoes = await apiRequest('questao');
-    if (!questoes || !questoes.data) return;
+    const respostas = await apiRequest(\'resposta\');
+    if (!respostas || !respostas.data) {
+        document.getElementById(\'respostasList\').innerHTML = \'<p>Erro ao carregar respostas.</p>\';
+        return;
+    }
     
-    const provaQuestoes = questoes.data.filter(q => q.id_prova == provaId);
-    const questoesList = document.getElementById('questoesList');
-    questoesList.innerHTML = '';
+    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
+    const respostasList = document.getElementById(\'respostasList\');
+    respostasList.innerHTML = \'\';
     
-    provaQuestoes.forEach(questao => {
-        const questaoCard = createQuestaoCard(questao);
-        questoesList.appendChild(questaoCard);
+    if (provaRespostas.length === 0) {
+        respostasList.innerHTML = \'<p>Nenhuma resposta encontrada para esta prova.</p>\';
+        return;
+    }
+
+    // Create table header
+    let tableHtml = `
+        <table class="responses-table">
+            <thead>
+                <tr>
+                    <th>ID Resposta</th>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>CPF</th>
+                    <th>IP</th>
+                    <th>Login</th>
+                    <th>Fim</th>
+                    <th>Respostas</th>
+                    <th>Nota Obj.</th>
+                    <th>Nota Disc.</th>
+                    <th>Nota Final</th>
+                    <th>Tentativas Sair</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    provaRespostas.forEach(resposta => {
+        let parsedRespostas = \'\';
+        try {
+            parsedRespostas = resposta.respostas ? JSON.stringify(JSON.parse(resposta.respostas), null, 2) : \'\'{}\'\';
+        } catch (e) {
+            parsedRespostas = resposta.respostas || \'Inválido\';
+        }
+
+        tableHtml += `
+            <tr>
+                <td>${resposta.id_resposta || \'\'}</td>
+                <td>${resposta.nome || \'\'}</td>
+                <td>${resposta.email || \'\'}</td>
+                <td>${formatCPF(resposta.cpf || \'\')}</td>
+                <td>${resposta.ip || \'\'}</td>
+                <td>${formatDateTime(resposta.hora_login)}</td>
+                <td>${formatDateTime(resposta.hora_fim)}</td>
+                <td><pre>${parsedRespostas}</pre></td>
+                <td>${resposta.nota_objetiva || \'\'}</td>
+                <td>${resposta.nota_discursiva || \'\'}</td>
+                <td>${resposta.nota_final || \'\'}</td>
+                <td>${resposta.tentativas_de_sair || 0}</td>
+            </tr>
+        `;
     });
+
+    tableHtml += `
+            </tbody>
+        </table>
+    `;
+    respostasList.innerHTML = tableHtml;
 }
 
-function createQuestaoCard(questao) {
+// Helper function to create a card for each response (if needed, currently using table)
+function createRespostaCard(resposta) {
+    const card = document.createElement(\'div\');
+    card.className = \'item-card\';
+    card.innerHTML = `
+        <div class="item-header">
+            <h4 class="item-title">Resposta de ${resposta.nome || \'Aluno Desconhecido\'}</h4>
+            <div class="item-actions">
+                <span>CPF: ${formatCPF(resposta.cpf || \'\')}</span>
+            </div>
+        </div>
+        <div class="item-details">
+            <div class="item-detail">
+                <strong>Login:</strong>
+                <span>${formatDateTime(resposta.hora_login)}</span>
+            </div>
+            <div class="item-detail">
+                <strong>Fim:</strong>
+                <span>${formatDateTime(resposta.hora_fim)}</span>
+            </div>
+            <div class="item-detail">
+                <strong>IP:</strong>
+                <span>${resposta.ip || \'\'}</span>
+            </div>
+            <div class="item-detail">
+                <strong>Nota Objetiva:</strong>
+                <span>${resposta.nota_objetiva || \'\'}</span>
+            </div>
+            <div class="item-detail">
+                <strong>Nota Discursiva:</strong>
+                <span>${resposta.nota_discursiva || \'\'}</span>
+            </div>
+            <div class="item-detail">
+                <strong>Nota Final:</strong>
+                <span>${resposta.nota_final || \'\'}</span>
+            </div>
+            <div class="item-detail">
+                <strong>Tentativas de Sair:</strong>
+                <span>${resposta.tentativas_de_sair || 0}</span>
+            </div>
+            <div class="item-detail full-width">
+                <strong>Respostas:</strong>
+                <pre>${resposta.respostas ? JSON.stringify(JSON.parse(resposta.respostas), null, 2) : \'\'{}\'\'}</pre>
+            </div>
+        </div>
+    `;
+    return card;
+}createQuestaoCard(questao) {
     const card = document.createElement('div');
     card.className = 'item-card';
     
@@ -539,60 +644,64 @@ async function deleteQuestao(id) {
 
 // Student Exam Functions
 async function startExam(studentData) {
-    const activeExam = await checkActiveExam();
-    if (!activeExam) {
-        showAlert('Erro', 'Não há prova ativa no momento.');
-        return;
-    }
+    try {
+        const activeExam = await checkActiveExam();
+        if (!activeExam) {
+            showAlert(\'Erro\', \'Não há prova ativa no momento.\');
+            return;
+        }
 
-    const respostas = await apiRequest("resposta");
-    let existingResponse = null;
+        const respostas = await apiRequest("resposta");
+        let existingResponse = null;
 
-    if (respostas && respostas.data) {
-        existingResponse = respostas.data.find(r => 
-            r.id_prova == activeExam.id_prova && r.cpf === studentData.cpf
-        );
-    }
+        if (respostas && respostas.data) {
+            existingResponse = respostas.data.find(r => 
+                r.id_prova == activeExam.id_prova && r.cpf === studentData.cpf
+            );
+        }
 
-    if (existingResponse && existingResponse.hora_fim) {
-        showAlert("Erro", "Você já finalizou esta prova.");
-        return;
-    }
+        if (existingResponse && existingResponse.hora_fim) {
+            showAlert("Erro", "Você já finalizou esta prova.");
+            return;
+        }
 
-    currentExam = activeExam;
+        currentExam = activeExam;
 
-    if (existingResponse) {
-        // Resume exam
-        currentExam.id_resposta = existingResponse.id_resposta;
-        studentAnswers = JSON.parse(existingResponse.respostas || "{}");
-        examStartTime = new Date(existingResponse.hora_login);
-        // No need to send data back, just proceed
-        await loadExamQuestions();
-        showExamScreen();
-    } else {
-        // Create new response record
-        const newResponseData = {
-            id_resposta: Date.now(),
-            id_prova: activeExam.id_prova,
-            nome: studentData.nome,
-            email: studentData.email,
-            cpf: studentData.cpf,
-            ip: await getUserIP(),
-            hora_login: new Date().toISOString(),
-            respostas: "{}",
-            tentativas_de_sair: 0
-        };
-
-        const result = await apiRequest("resposta", "POST", newResponseData);
-        if (result && result.success) {
-            currentExam.id_resposta = newResponseData.id_resposta;
-            examStartTime = new Date();
-            studentAnswers = {};
+        if (existingResponse) {
+            // Resume exam
+            currentExam.id_resposta = existingResponse.id_resposta;
+            studentAnswers = JSON.parse(existingResponse.respostas || "{}");
+            examStartTime = new Date(existingResponse.hora_login);
             await loadExamQuestions();
             showExamScreen();
         } else {
-            showAlert("Erro", "Erro ao iniciar prova.");
+            // Create new response record
+            const newResponseData = {
+                id_resposta: Date.now(),
+                id_prova: activeExam.id_prova,
+                nome: studentData.nome,
+                email: studentData.email,
+                cpf: studentData.cpf,
+                ip: await getUserIP(),
+                hora_login: new Date().toISOString(),
+                respostas: "{}",
+                tentativas_de_sair: 0
+            };
+
+            const result = await apiRequest("resposta", "POST", newResponseData);
+            if (result && result.success) {
+                currentExam.id_resposta = newResponseData.id_resposta;
+                examStartTime = new Date();
+                studentAnswers = {};
+                await loadExamQuestions();
+                showExamScreen();
+            } else {
+                showAlert("Erro", "Erro ao iniciar prova.");
+            }
         }
+    } catch (error) {
+        console.error("Erro em startExam:", error);
+        showAlert("Erro Crítico", "Ocorreu um erro inesperado ao iniciar a prova. Tente novamente.");
     }
 }
 
