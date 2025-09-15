@@ -1,3 +1,4 @@
+
 // WM Prova Online - JavaScript
 // Sistema de provas online para professores e alunos
 
@@ -26,11 +27,16 @@ function hideLoading() {
 }
 
 function showAlert(title, message) {
-    document.getElementById(\'alertTitle\').textContent = title;
-    document.getElementById(\'alertMessage\').textContent = message;
-    document.getElementById(\'alertModal\').style.display = \'flex\';
-    // Ensure the button correctly closes the alert
-    document.getElementById(\'alertOkBtn\').onclick = () => { hideAlert(); };
+    document.getElementById('alertTitle').textContent = title;
+    document.getElementById('alertMessage').textContent = message;
+    document.getElementById('alertModal').style.display = 'flex';
+    const alertOkBtn = document.getElementById('alertOkBtn');
+    if (alertOkBtn) {
+        // Clear previous event listeners to prevent multiple firings
+        const newAlertOkBtn = alertOkBtn.cloneNode(true);
+        alertOkBtn.parentNode.replaceChild(newAlertOkBtn, alertOkBtn);
+        newAlertOkBtn.addEventListener('click', hideAlert);
+    }
 }
 
 function hideAlert() {
@@ -38,19 +44,30 @@ function hideAlert() {
 }
 
 function showConfirm(title, message, callback) {
-    document.getElementById(\'confirmTitle\').textContent = title;
-    document.getElementById(\'confirmMessage\').textContent = message;
-    document.getElementById(\'confirmModal\').style.display = \'flex\';
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmModal').style.display = 'flex';
     
-    document.getElementById(\'confirmYesBtn\').onclick = () => {
-        hideConfirm();
-        callback(true);
-    };
-    
-    document.getElementById(\'confirmNoBtn\').onclick = () => {
-        hideConfirm();
-        callback(false);
-    };
+    const confirmYesBtn = document.getElementById('confirmYesBtn');
+    const confirmNoBtn = document.getElementById('confirmNoBtn');
+
+    // Clear previous event listeners
+    if (confirmYesBtn) {
+        const newConfirmYesBtn = confirmYesBtn.cloneNode(true);
+        confirmYesBtn.parentNode.replaceChild(newConfirmYesBtn, confirmYesBtn);
+        newConfirmYesBtn.addEventListener('click', () => {
+            hideConfirm();
+            callback(true);
+        });
+    }
+    if (confirmNoBtn) {
+        const newConfirmNoBtn = confirmNoBtn.cloneNode(true);
+        confirmNoBtn.parentNode.replaceChild(newConfirmNoBtn, confirmNoBtn);
+        newConfirmNoBtn.addEventListener('click', () => {
+            hideConfirm();
+            callback(false);
+        });
+    }
 }
 
 function hideConfirm() {
@@ -60,15 +77,18 @@ function hideConfirm() {
 function formatDateTime(dateTimeString) {
     if (!dateTimeString) return '';
     const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return ''; // Validate date
     return date.toLocaleString('pt-BR');
 }
 
 function formatCPF(cpf) {
+    if (!cpf) return '';
+    cpf = String(cpf).replace(/\D/g, '');
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
 function validateCPF(cpf) {
-    cpf = cpf.replace(/[^\d]/g, '');
+    cpf = String(cpf).replace(/\D/g, '');
     return cpf.length === 11;
 }
 
@@ -76,12 +96,14 @@ function validateCPF(cpf) {
 function showScreen(screenId) {
     document.querySelectorAll('.screen').forEach(screen => {
         screen.classList.remove('active');
-        screen.style.display = 'none'; // Ensure it's hidden
+        screen.style.display = 'none'; // Explicitly hide
     });
     const targetScreen = document.getElementById(screenId);
     if (targetScreen) {
         targetScreen.classList.add('active');
-        targetScreen.style.display = 'flex'; // Or 'block' depending on your CSS
+        targetScreen.style.display = 'block'; // Explicitly show
+    } else {
+        console.error(`Erro: Tela com ID '${screenId}' não encontrada.`);
     }
 }
 
@@ -102,84 +124,65 @@ async function apiRequest(tabela, method = 'GET', data = null) {
     if (method === 'GET') {
         return new Promise((resolve, reject) => {
             const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-            window[callbackName] = function(data) {
+            window[callbackName] = function(response) {
                 delete window[callbackName];
-                document.body.removeChild(script);
+                const scriptElement = document.getElementById(callbackName + '_script');
+                if (scriptElement) document.body.removeChild(scriptElement);
                 hideLoading();
-                if (data.success) {
-                    resolve(data);
+                if (response && response.success) {
+                    resolve(response);
                 } else {
-                    console.error('API Error (JSONP):', data.erro);
-                    showAlert('Erro de API', data.erro || 'Ocorreu um erro ao buscar os dados.');
-                    reject(data);
+                    console.error('API Error (JSONP):', response ? response.erro : 'Resposta inválida da API.');
+                    showAlert('Erro de API', response ? response.erro : 'Ocorreu um erro ao buscar os dados.');
+                    reject(response);
                 }
             };
 
             const script = document.createElement('script');
+            script.id = callbackName + '_script';
             script.src = `${API_BASE}?tabela=${tabela}&key=${API_KEY}&callback=${callbackName}`;
             script.onerror = () => {
                 delete window[callbackName];
-                document.body.removeChild(script);
+                const scriptElement = document.getElementById(callbackName + '_script');
+                if (scriptElement) document.body.removeChild(scriptElement);
                 hideLoading();
                 const errorMsg = 'Não foi possível conectar ao servidor. Verifique a URL da API e a sua conexão.';
                 console.error('API Error:', errorMsg);
                 showAlert('Erro de Conexão', errorMsg);
-                reject(errorMsg);
+                reject(new Error(errorMsg));
             };
             document.body.appendChild(script);
         });
     }
 
-    // Fetch with CORS for POST requests (as per Google Apps Script example)
-    if (method === 'POST') {
+    // Fetch with CORS for POST/PUT requests
+    if (method === 'POST' || method === 'PUT') {
         try {
             const url = new URL(API_BASE);
             url.searchParams.append('tabela', tabela);
             url.searchParams.append('key', API_KEY);
 
+            // For PUT, add action: "update" to the data payload
+            const payload = method === 'PUT' ? { ...data, action: 'update' } : data;
+
             const response = await fetch(url.toString(), {
-                method: 'POST',
-                body: JSON.stringify(data),
+                method: 'POST', // Google Apps Script uses doPost for both POST and PUT actions
+                body: JSON.stringify(payload),
                 headers: {
                     'Content-Type': 'text/plain;charset=utf-8', // Required by Google Apps Script
                 },
-                mode: 'no-cors' // POST requests to Apps Script often need this
+                mode: 'no-cors' // Use no-cors for cross-origin requests to Apps Script
             });
             
             hideLoading();
-            // no-cors mode doesn't allow reading the response, so we assume success
+            // In no-cors mode, we cannot read the response, so we assume success for now.
+            // The Apps Script should handle the actual success/failure logic.
             return { success: true }; 
 
         } catch (error) {
             hideLoading();
-            console.error("API POST Error:", error);
-            showAlert("Erro", "Erro de conexão ao salvar os dados. Tente novamente.");
-            return null;
-        }
-    }
-
-    // Fetch with CORS for PUT requests
-    if (method === "PUT") {
-        try {
-            const url = new URL(API_BASE);
-            url.searchParams.append("tabela", tabela);
-            url.searchParams.append("key", API_KEY);
-
-            const response = await fetch(url.toString(), {
-                method: "POST", // Google Apps Script uses doPost for PUT actions
-                body: JSON.stringify({ ...data, action: "update" }), // Add action for GAS
-                headers: {
-                    "Content-Type": "text/plain;charset=utf-8",
-                },
-                mode: "no-cors",
-            });
-
-            hideLoading();
-            return { success: true };
-        } catch (error) {
-            hideLoading();
-            console.error("API PUT Error:", error);
-            showAlert("Erro", "Erro de conexão ao atualizar os dados. Tente novamente.");
+            console.error(`API ${method} Error:`, error);
+            showAlert('Erro', `Erro de conexão ao ${method === 'PUT' ? 'atualizar' : 'salvar'} os dados. Tente novamente.`);
             return null;
         }
     }
@@ -188,8 +191,6 @@ async function apiRequest(tabela, method = 'GET', data = null) {
 // Professor Functions
 async function loginProfessor(usuario, senha) {
     const users = await apiRequest('usuario');
-    console.log("Usuarios recebidos:", users);
-    console.log("Digitado:", usuario, senha);
     if (!users || !users.data) {
         showAlert('Erro', 'Erro ao verificar credenciais.');
         return false;
@@ -303,10 +304,8 @@ async function saveProva(formData) {
 
     let result;
     if (id_prova) {
-        // If id_prova exists, it's an update
         result = await apiRequest("prova", "PUT", data);
     } else {
-        // Otherwise, it's a new entry
         result = await apiRequest("prova", "POST", data);
     }
 
@@ -368,130 +367,33 @@ async function deleteProva(id) {
     });
 }
 
-// Quasync function loadRespostas(provaId) {
+// Questoes Functions
+async function loadQuestoes(provaId) {
+    const questoesList = document.getElementById('questoesList');
+    questoesList.innerHTML = '';
+
     if (!provaId) {
-        document.getElementById(\'respostasList\').innerHTML = \'\';
-        return;
-    }
-    
-    const respostas = await apiRequest(\'resposta\');
-    if (!respostas || !respostas.data) {
-        document.getElementById(\'respostasList\').innerHTML = \'<p>Erro ao carregar respostas.</p>\';
-        return;
-    }
-    
-    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
-    const respostasList = document.getElementById(\'respostasList\');
-    respostasList.innerHTML = \'\';
-    
-    if (provaRespostas.length === 0) {
-        respostasList.innerHTML = \'<p>Nenhuma resposta encontrada para esta prova.</p>\';
+        questoesList.innerHTML = '<p>Selecione uma prova para ver as questões.</p>';
         return;
     }
 
-    // Create table header
-    let tableHtml = `
-        <table class="responses-table">
-            <thead>
-                <tr>
-                    <th>ID Resposta</th>
-                    <th>Nome</th>
-                    <th>Email</th>
-                    <th>CPF</th>
-                    <th>IP</th>
-                    <th>Login</th>
-                    <th>Fim</th>
-                    <th>Respostas</th>
-                    <th>Nota Obj.</th>
-                    <th>Nota Disc.</th>
-                    <th>Nota Final</th>
-                    <th>Tentativas Sair</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+    const questoes = await apiRequest('questao');
+    if (!questoes || !questoes.data) return;
 
-    provaRespostas.forEach(resposta => {
-        let parsedRespostas = \'\';
-        try {
-            parsedRespostas = resposta.respostas ? JSON.stringify(JSON.parse(resposta.respostas), null, 2) : \'\'{}\'\';
-        } catch (e) {
-            parsedRespostas = resposta.respostas || \'Inválido\';
-        }
+    const provaQuestoes = questoes.data.filter(q => q.id_prova == provaId);
 
-        tableHtml += `
-            <tr>
-                <td>${resposta.id_resposta || \'\'}</td>
-                <td>${resposta.nome || \'\'}</td>
-                <td>${resposta.email || \'\'}</td>
-                <td>${formatCPF(resposta.cpf || \'\')}</td>
-                <td>${resposta.ip || \'\'}</td>
-                <td>${formatDateTime(resposta.hora_login)}</td>
-                <td>${formatDateTime(resposta.hora_fim)}</td>
-                <td><pre>${parsedRespostas}</pre></td>
-                <td>${resposta.nota_objetiva || \'\'}</td>
-                <td>${resposta.nota_discursiva || \'\'}</td>
-                <td>${resposta.nota_final || \'\'}</td>
-                <td>${resposta.tentativas_de_sair || 0}</td>
-            </tr>
-        `;
+    if (provaQuestoes.length === 0) {
+        questoesList.innerHTML = '<p>Nenhuma questão encontrada para esta prova.</p>';
+        return;
+    }
+
+    provaQuestoes.forEach(questao => {
+        const questaoCard = createQuestaoCard(questao);
+        questoesList.appendChild(questaoCard);
     });
-
-    tableHtml += `
-            </tbody>
-        </table>
-    `;
-    respostasList.innerHTML = tableHtml;
 }
 
-// Helper function to create a card for each response (if needed, currently using table)
-function createRespostaCard(resposta) {
-    const card = document.createElement(\'div\');
-    card.className = \'item-card\';
-    card.innerHTML = `
-        <div class="item-header">
-            <h4 class="item-title">Resposta de ${resposta.nome || \'Aluno Desconhecido\'}</h4>
-            <div class="item-actions">
-                <span>CPF: ${formatCPF(resposta.cpf || \'\')}</span>
-            </div>
-        </div>
-        <div class="item-details">
-            <div class="item-detail">
-                <strong>Login:</strong>
-                <span>${formatDateTime(resposta.hora_login)}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Fim:</strong>
-                <span>${formatDateTime(resposta.hora_fim)}</span>
-            </div>
-            <div class="item-detail">
-                <strong>IP:</strong>
-                <span>${resposta.ip || \'\'}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Objetiva:</strong>
-                <span>${resposta.nota_objetiva || \'\'}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Discursiva:</strong>
-                <span>${resposta.nota_discursiva || \'\'}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Nota Final:</strong>
-                <span>${resposta.nota_final || \'\'}</span>
-            </div>
-            <div class="item-detail">
-                <strong>Tentativas de Sair:</strong>
-                <span>${resposta.tentativas_de_sair || 0}</span>
-            </div>
-            <div class="item-detail full-width">
-                <strong>Respostas:</strong>
-                <pre>${resposta.respostas ? JSON.stringify(JSON.parse(resposta.respostas), null, 2) : \'\'{}\'\'}</pre>
-            </div>
-        </div>
-    `;
-    return card;
-}createQuestaoCard(questao) {
+function createQuestaoCard(questao) {
     const card = document.createElement('div');
     card.className = 'item-card';
     
@@ -555,10 +457,8 @@ async function saveQuestao(formData) {
 
     let result;
     if (id_questao) {
-        // If id_questao exists, it's an update
         result = await apiRequest("questao", "PUT", data);
     } else {
-        // Otherwise, it's a new entry
         result = await apiRequest("questao", "POST", data);
     }
 
@@ -593,23 +493,23 @@ function showQuestaoForm(questao = null) {
         form.opcao_d.value = questao.opcao_d || '';
         form.opcao_e.value = questao.opcao_e || '';
         form.resposta_correta.value = questao.resposta_correta || '';
-        
-        // Show/hide objective options based on question type
-        if (questao.tipo === 'objetiva') {
-            document.getElementById('objectiveOptions').style.display = 'block';
-            document.getElementById('correctAnswer').style.display = 'block';
-        } else {
-            document.getElementById('objectiveOptions').style.display = 'none';
-            document.getElementById('correctAnswer').style.display = 'none';
-        }
     } else {
         title.textContent = 'Nova Questão';
         form.reset();
         form.id_questao.value = '';
         form.id_prova.value = provaId;
-        document.getElementById('objectiveOptions').style.display = 'none';
-        document.getElementById('correctAnswer').style.display = 'none';
+        form.tipo.value = 'objetiva'; // Default to objetiva
+        // Clear options when creating new question
+        form.opcao_a.value = '';
+        form.opcao_b.value = '';
+        form.opcao_c.value = '';
+        form.opcao_d.value = '';
+        form.opcao_e.value = '';
+        form.resposta_correta.value = '';
     }
+    
+    // Toggle objective options visibility based on question type
+    toggleObjectiveOptions(form.tipo.value);
     
     document.getElementById('questaoForm').style.display = 'flex';
 }
@@ -642,229 +542,383 @@ async function deleteQuestao(id) {
     });
 }
 
-// Student Exam Functions
-async function startExam(studentData) {
-    try {
-        const activeExam = await checkActiveExam();
-        if (!activeExam) {
-            showAlert(\'Erro\', \'Não há prova ativa no momento.\');
-            return;
-        }
-
-        const respostas = await apiRequest("resposta");
-        let existingResponse = null;
-
-        if (respostas && respostas.data) {
-            existingResponse = respostas.data.find(r => 
-                r.id_prova == activeExam.id_prova && r.cpf === studentData.cpf
-            );
-        }
-
-        if (existingResponse && existingResponse.hora_fim) {
-            showAlert("Erro", "Você já finalizou esta prova.");
-            return;
-        }
-
-        currentExam = activeExam;
-
-        if (existingResponse) {
-            // Resume exam
-            currentExam.id_resposta = existingResponse.id_resposta;
-            studentAnswers = JSON.parse(existingResponse.respostas || "{}");
-            examStartTime = new Date(existingResponse.hora_login);
-            await loadExamQuestions();
-            showExamScreen();
+function toggleObjectiveOptions(type) {
+    const objectiveOptions = document.getElementById('objectiveOptions');
+    if (objectiveOptions) {
+        if (type === 'objetiva') {
+            objectiveOptions.style.display = 'block';
         } else {
-            // Create new response record
-            const newResponseData = {
-                id_resposta: Date.now(),
-                id_prova: activeExam.id_prova,
-                nome: studentData.nome,
-                email: studentData.email,
-                cpf: studentData.cpf,
-                ip: await getUserIP(),
-                hora_login: new Date().toISOString(),
-                respostas: "{}",
-                tentativas_de_sair: 0
-            };
-
-            const result = await apiRequest("resposta", "POST", newResponseData);
-            if (result && result.success) {
-                currentExam.id_resposta = newResponseData.id_resposta;
-                examStartTime = new Date();
-                studentAnswers = {};
-                await loadExamQuestions();
-                showExamScreen();
-            } else {
-                showAlert("Erro", "Erro ao iniciar prova.");
-            }
+            objectiveOptions.style.display = 'none';
         }
-    } catch (error) {
-        console.error("Erro em startExam:", error);
-        showAlert("Erro Crítico", "Ocorreu um erro inesperado ao iniciar a prova. Tente novamente.");
     }
 }
 
-async function getUserIP() {
-    return new Promise((resolve) => {
-        fetch('https://api.ipify.org?format=json')
-            .then(response => response.json())
-            .then(data => resolve(data.ip))
-            .catch(() => resolve('unknown'));
-    });
-}
+// Respostas Functions
+async function loadRespostas(provaId) {
+    const respostasList = document.getElementById('respostasList');
+    respostasList.innerHTML = '';
 
-async function checkActiveExam() {
-    const provas = await apiRequest('prova');
-    if (!provas || !provas.data) return null;
-
-    const now = new Date();
-    const active = provas.data.find(prova => {
-        const startDate = new Date(prova.data_inicio);
-        const endDate = new Date(prova.data_fim);
-        return now >= startDate && now <= endDate;
-    });
-    return active;
-}
-
-function loadExamQuestions() {
-    const examQuestionsList = document.getElementById('examQuestionsList');
-    examQuestionsList.innerHTML = '';
-
-    examQuestions.forEach((question, index) => {
-        const questionElement = document.createElement('div');
-        questionElement.className = 'exam-question-card';
-        questionElement.innerHTML = `
-            <h4>Questão ${index + 1} (${question.tipo === 'objetiva' ? 'Objetiva' : 'Discursiva'}) - Peso: ${question.peso}</h4>
-            <p>${question.enunciado}</p>
-            ${question.tipo === 'objetiva' ? `
-                <div class="options">
-                    <label><input type="radio" name="question_${question.id_questao}" value="A"> A) ${question.opcao_a}</label>
-                    <label><input type="radio" name="question_${question.id_questao}" value="B"> B) ${question.opcao_b}</label>
-                    <label><input type="radio" name="question_${question.id_questao}" value="C"> C) ${question.opcao_c}</label>
-                    <label><input type="radio" name="question_${question.id_questao}" value="D"> D) ${question.opcao_d}</label>
-                    <label><input type="radio" name="question_${question.id_questao}" value="E"> E) ${question.opcao_e}</label>
-                </div>
-            ` : `
-                <textarea name="question_${question.id_questao}" rows="5" placeholder="Sua resposta..."></textarea>
-            `}
-        `;
-        examQuestionsList.appendChild(questionElement);
-
-        // Restore previous answer if exists
-        if (studentAnswers[question.id_questao]) {
-            if (question.tipo === 'objetiva') {
-                const radio = questionElement.querySelector(`input[value="${studentAnswers[question.id_questao]}"]`);
-                if (radio) radio.checked = true;
-            } else {
-                const textarea = questionElement.querySelector('textarea');
-                if (textarea) textarea.value = studentAnswers[question.id_questao];
-            }
-        }
-
-        // Add event listener to save answer on change
-        questionElement.addEventListener('change', (event) => {
-            const target = event.target;
-            const questionId = question.id_questao;
-            if (target.type === 'radio' || target.tagName === 'TEXTAREA') {
-                studentAnswers[questionId] = target.value;
-            }
-        });
-    });
-}
-
-function updateExamTimerDisplay() {
-    const timerElement = document.getElementById('timer');
-    const now = Date.now();
-    const elapsed = now - examStartTime.getTime();
-    const remaining = examDuration * 60 * 1000 - elapsed;
-
-    if (remaining <= 0) {
-        clearInterval(examTimer);
-        finishExam(true); // Auto-finish
+    if (!provaId) {
+        respostasList.innerHTML = '<p>Selecione uma prova para ver as respostas.</p>';
         return;
     }
 
-    const hours = Math.floor(remaining / (1000 * 60 * 60));
-    const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-
-    timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-
-    // Change color when time is running out
-    if (remaining < 300000) { // 5 minutes
-        timerElement.style.color = '#dc3545';
-    } else if (remaining < 600000) { // 10 minutes
-        timerElement.style.color = '#ffc107';
+    const respostas = await apiRequest('resposta');
+    if (!respostas || !respostas.data) {
+        respostasList.innerHTML = '<p>Nenhuma resposta encontrada para esta prova.</p>';
+        return;
     }
+
+    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
+
+    if (provaRespostas.length === 0) {
+        respostasList.innerHTML = '<p>Nenhuma resposta encontrada para esta prova.</p>';
+        return;
+    }
+
+    // Create table header
+    let tableHTML = `
+        <table class="responses-table">
+            <thead>
+                <tr>
+                    <th>ID Resposta</th>
+                    <th>Nome</th>
+                    <th>Email</th>
+                    <th>CPF</th>
+                    <th>IP</th>
+                    <th>Login</th>
+                    <th>Fim</th>
+                    <th>Respostas</th>
+                    <th>Nota Obj.</th>
+                    <th>Nota Disc.</th>
+                    <th>Nota Final</th>
+                    <th>Tentativas Sair</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    // Add rows to table
+    provaRespostas.forEach(resposta => {
+        // Attempt to parse 'respostas' field if it's a stringified JSON
+        let parsedRespostas = {};
+        try {
+            parsedRespostas = JSON.parse(resposta.respostas || '{}');
+        } catch (e) {
+            console.error('Error parsing respostas JSON:', e);
+            parsedRespostas = { 'Erro': 'JSON inválido' };
+        }
+
+        tableHTML += `
+            <tr>
+                <td>${resposta.id_resposta}</td>
+                <td>${resposta.nome}</td>
+                <td>${resposta.email}</td>
+                <td>${formatCPF(resposta.cpf)}</td>
+                <td>${resposta.ip || 'N/A'}</td>
+                <td>${formatDateTime(resposta.hora_login)}</td>
+                <td>${formatDateTime(resposta.hora_fim)}</td>
+                <td><pre>${JSON.stringify(parsedRespostas, null, 2)}</pre></td>
+                <td>${resposta.nota_objetiva || ''}</td>
+                <td>${resposta.nota_discursiva || ''}</td>
+                <td>${resposta.nota_final || ''}</td>
+                <td>${resposta.tentativas_de_sair || ''}</td>
+            </tr>
+        `;
+    });
+
+    tableHTML += `
+            </tbody>
+        </table>
+    `;
+    respostasList.innerHTML = tableHTML;
+}
+
+// Student Functions
+async function startExam() {
+    showLoading();
+    try {
+        const studentName = document.getElementById('studentName').value;
+        const studentEmail = document.getElementById('studentEmail').value;
+        const studentCpf = document.getElementById('studentCpf').value;
+        const provaId = document.getElementById('studentProvaSelect').value;
+
+        if (!studentName || !studentEmail || !studentCpf || !provaId) {
+            showAlert('Erro', 'Por favor, preencha todos os campos e selecione uma prova.');
+            hideLoading();
+            return;
+        }
+
+        if (!validateCPF(studentCpf)) {
+            showAlert('Erro', 'CPF inválido. Por favor, insira um CPF válido com 11 dígitos.');
+            hideLoading();
+            return;
+        }
+
+        // Fetch prova details
+        const provas = await apiRequest('prova');
+        if (!provas || !provas.data) {
+            showAlert('Erro', 'Não foi possível carregar os detalhes da prova.');
+            hideLoading();
+            return;
+        }
+        const prova = provas.data.find(p => p.id_prova == provaId);
+        if (!prova) {
+            showAlert('Erro', 'Prova selecionada não encontrada.');
+            hideLoading();
+            return;
+        }
+
+        // Check if exam is active
+        const now = new Date();
+        const startDate = new Date(prova.data_inicio);
+        const endDate = new Date(prova.data_fim);
+
+        if (now < startDate) {
+            showAlert('Aviso', 'A prova ainda não começou. Data de início: ' + formatDateTime(prova.data_inicio));
+            hideLoading();
+            return;
+        }
+        if (now > endDate) {
+            showAlert('Aviso', 'A prova já terminou. Data de término: ' + formatDateTime(prova.data_fim));
+            hideLoading();
+            return;
+        }
+
+        // Fetch questions for the prova
+        const questoes = await apiRequest('questao');
+        if (!questoes || !questoes.data) {
+            showAlert('Erro', 'Não foi possível carregar as questões da prova.');
+            hideLoading();
+            return;
+        }
+        examQuestions = questoes.data.filter(q => q.id_prova == provaId);
+        if (examQuestions.length === 0) {
+            showAlert('Erro', 'Nenhuma questão encontrada para esta prova.');
+            hideLoading();
+            return;
+        }
+
+        // Get student IP address
+        let studentIp = 'unknown';
+        try {
+            const ipResponse = await fetch('https://api.ipify.org?format=json');
+            const ipData = await ipResponse.json();
+            studentIp = ipData.ip;
+        } catch (ipError) {
+            console.warn('Could not fetch IP address:', ipError);
+        }
+
+        // Check for existing response to update or create new
+        const existingResponses = await apiRequest('resposta');
+        let existingStudentResponse = null;
+        if (existingResponses && existingResponses.data) {
+            existingStudentResponse = existingResponses.data.find(r => 
+                r.id_prova == provaId && r.cpf == studentCpf
+            );
+        }
+
+        if (existingStudentResponse) {
+            // Resume existing exam
+            currentExam = {
+                id_resposta: existingStudentResponse.id_resposta,
+                id_prova: provaId,
+                nome: studentName,
+                email: studentEmail,
+                cpf: studentCpf,
+                ip: studentIp,
+                hora_login: existingStudentResponse.hora_login, // Keep original login time
+                hora_fim: '',
+                respostas: JSON.parse(existingStudentResponse.respostas || '{}'),
+                nota_objetiva: existingStudentResponse.nota_objetiva || 0,
+                nota_discursiva: existingStudentResponse.nota_discursiva || 0,
+                nota_final: existingStudentResponse.nota_final || 0,
+                tentativas_de_sair: existingStudentResponse.tentativas_de_sair || 0
+            };
+            studentAnswers = currentExam.respostas; // Load existing answers
+            showAlert('Aviso', 'Você está retomando uma prova existente.');
+        } else {
+            // Start new exam
+            currentExam = {
+                id_resposta: Date.now(), // Generate new ID
+                id_prova: provaId,
+                nome: studentName,
+                email: studentEmail,
+                cpf: studentCpf,
+                ip: studentIp,
+                hora_login: new Date().toISOString(),
+                hora_fim: '',
+                respostas: {},
+                nota_objetiva: 0,
+                nota_discursiva: 0,
+                nota_final: 0,
+                tentativas_de_sair: 0
+            };
+            studentAnswers = {};
+            // Save initial response record (POST)
+            await apiRequest('resposta', 'POST', currentExam);
+        }
+
+        // Set exam details
+        document.getElementById('examTitle').textContent = prova.titulo;
+        examDuration = prova.duracao_minutos * 60; // Convert to seconds
+        examStartTime = new Date();
+        
+        // Render questions
+        renderExamQuestions();
+        startExamTimer();
+        
+        // Enable exam mode (fullscreen, anti-cheat)
+        await enableExamMode();
+        showScreen('examScreen');
+
+    } catch (error) {
+        console.error('Erro ao iniciar prova:', error);
+        showAlert('Erro', 'Não foi possível iniciar a prova. Tente novamente mais tarde.');
+    } finally {
+        hideLoading();
+    }
+}
+
+function renderExamQuestions() {
+    const examQuestionsContainer = document.getElementById('examQuestionsContainer');
+    examQuestionsContainer.innerHTML = '';
+
+    examQuestions.forEach((questao, index) => {
+        const questionElement = document.createElement('div');
+        questionElement.className = 'question-card';
+        questionElement.dataset.id = questao.id_questao;
+
+        let optionsHTML = '';
+        if (questao.tipo === 'objetiva') {
+            const options = ['a', 'b', 'c', 'd', 'e'];
+            optionsHTML = '<div class="question-options">';
+            options.forEach(optionKey => {
+                const optionText = questao[`opcao_${optionKey}`];
+                if (optionText) {
+                    const isChecked = studentAnswers[questao.id_questao] === optionKey;
+                    optionsHTML += `
+                        <label class="option-item">
+                            <input type="radio" name="question_${questao.id_questao}" value="${optionKey}" ${isChecked ? 'checked' : ''}>
+                            <span class="option-text">${optionText}</span>
+                        </label>
+                    `;
+                }
+            });
+            optionsHTML += '</div>';
+        } else if (questao.tipo === 'discursiva') {
+            const currentAnswer = studentAnswers[questao.id_questao] || '';
+            optionsHTML = `
+                <textarea class="question-textarea" placeholder="Digite sua resposta aqui..." oninput="saveStudentAnswer(${questao.id_questao}, this.value)">${currentAnswer}</textarea>
+            `;
+        }
+
+        questionElement.innerHTML = `
+            <div class="question-header">
+                <span class="question-number">${index + 1}.</span>
+                <h4 class="question-text">${questao.enunciado}</h4>
+                <span class="question-type">${questao.tipo === 'objetiva' ? 'Objetiva' : 'Discursiva'}</span>
+            </div>
+            ${optionsHTML}
+        `;
+        examQuestionsContainer.appendChild(questionElement);
+
+        // Add event listener for objective questions
+        if (questao.tipo === 'objetiva') {
+            const radioButtons = questionElement.querySelectorAll(`input[name="question_${questao.id_questao}"]`);
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', (event) => {
+                    saveStudentAnswer(questao.id_questao, event.target.value);
+                });
+            });
+        }
+    });
 }
 
 function startExamTimer() {
-    const timerElement = document.getElementById('timer');
-    const startTime = examStartTime.getTime();
-    const duration = examDuration * 1000; // Convert to milliseconds
-    
+    const timerElement = document.getElementById('examTimer');
+    if (!timerElement) return;
+
+    clearInterval(examTimer);
     examTimer = setInterval(() => {
-        const now = Date.now();
-        const elapsed = now - startTime;
-        const remaining = duration - elapsed;
-        
-        if (remaining <= 0) {
+        const now = new Date();
+        const elapsedSeconds = Math.floor((now - examStartTime) / 1000);
+        const remainingSeconds = examDuration - elapsedSeconds;
+
+        if (remainingSeconds <= 0) {
             clearInterval(examTimer);
-            finishExam(true); // Auto-finish
+            timerElement.textContent = '00:00:00';
+            showAlert('Tempo Esgotado', 'O tempo para a prova acabou. Suas respostas serão enviadas automaticamente.');
+            finishExam(true); // Auto-submit
             return;
         }
-        
-        const hours = Math.floor(remaining / (1000 * 60 * 60));
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((remaining % (1000 * 60)) / 1000);
-        
-        timerElement.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        
-        // Change color when time is running out
-        if (remaining < 300000) { // 5 minutes
-            timerElement.style.color = '#dc3545';
-        } else if (remaining < 600000) { // 10 minutes
-            timerElement.style.color = '#ffc107';
-        }
+
+        const hours = String(Math.floor(remainingSeconds / 3600)).padStart(2, '0');
+        const minutes = String(Math.floor((remainingSeconds % 3600) / 60)).padStart(2, '0');
+        const seconds = String(remainingSeconds % 60).padStart(2, '0');
+
+        timerElement.textContent = `${hours}:${minutes}:${seconds}`;
     }, 1000);
 }
 
-async function finishExam(autoFinish = false) {
-    if (examTimer) {
-        clearInterval(examTimer);
+function saveStudentAnswer(questionId, answer) {
+    studentAnswers[questionId] = answer;
+    // Optionally save answers to API periodically or on blur
+    // For now, only save on finishExam
+}
+
+async function finishExam(autoSubmit = false) {
+    showLoading();
+    clearInterval(examTimer);
+    isExamMode = false; // Exit exam mode
+
+    // Exit fullscreen if still in it
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
     }
 
-    // Calculate objective score
-    let objectiveScore = 0;
-    examQuestions.forEach(question => {
-        if (question.tipo === 'objetiva' && studentAnswers[question.id_questao] === question.resposta_correta) {
-            objectiveScore += parseFloat(question.peso);
+    // Remove security event listeners
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('contextmenu', handleContextMenu);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+
+    // Calculate scores (simplified for now)
+    let notaObjetiva = 0;
+    let notaDiscursiva = 0;
+
+    examQuestions.forEach(q => {
+        const studentAns = studentAnswers[q.id_questao];
+        if (q.tipo === 'objetiva' && studentAns === q.resposta_correta) {
+            notaObjetiva += q.peso;
+        } else if (q.tipo === 'discursiva') {
+            // For discursive, professor will grade later. For now, just store the answer.
+            // You might want a more sophisticated auto-grading or placeholder here.
         }
     });
 
-    // Update response
-    const updateData = {
-        id_resposta: currentExam.id_resposta, // Use the stored id_resposta
-        respostas: JSON.stringify(studentAnswers),
-        hora_fim: new Date().toISOString(),
-        nota_objetiva: objectiveScore,
-        tentativas_de_sair: exitAttempts
-    };
+    currentExam.hora_fim = new Date().toISOString();
+    currentExam.respostas = studentAnswers;
+    currentExam.nota_objetiva = notaObjetiva;
+    currentExam.nota_discursiva = notaDiscursiva; // Placeholder
+    currentExam.nota_final = notaObjetiva + notaDiscursiva; // Placeholder
 
-    const result = await apiRequest('resposta', 'PUT', updateData);
+    // Send updated response to API (PUT request)
+    const result = await apiRequest('resposta', 'PUT', currentExam);
 
-    disableExamMode();
-
-    if (autoFinish) {
-        document.getElementById('resultMessage').textContent = 'Seu tempo de prova expirou. Você não pode mais responder.';
+    if (result && result.success) {
+        showAlert('Prova Finalizada', 'Suas respostas foram enviadas com sucesso!');
+        showScreen('resultScreen');
+        document.getElementById('resultProvaTitle').textContent = currentExam.nome + ' - ' + document.getElementById('examTitle').textContent;
+        document.getElementById('resultNotaFinal').textContent = currentExam.nota_final;
     } else {
-        document.getElementById('resultMessage').textContent = 'Prova finalizada com sucesso!';
+        showAlert('Erro', 'Erro ao finalizar a prova. Por favor, tente novamente.');
     }
-
-    showScreen('resultScreen');
+    hideLoading();
 }
 
+// Anti-cheat and Fullscreen Functions
 async function enableExamMode() {
     isExamMode = true;
     document.body.classList.add('exam-mode');
@@ -873,8 +927,8 @@ async function enableExamMode() {
     try {
         await document.documentElement.requestFullscreen();
     } catch (err) {
-        console.warn("Failed to enter fullscreen:", err);
-        showAlert("Aviso", "Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.");
+        console.warn('Failed to enter fullscreen:', err);
+        showAlert('Aviso', 'Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.');
     }
     
     // Add event listeners for security
@@ -885,208 +939,227 @@ async function enableExamMode() {
     window.addEventListener('beforeunload', handleBeforeUnload);
 }
 
-function disableExamMode() {
-    isExamMode = false;
-    document.body.classList.remove('exam-mode');
-    
-    // Exit fullscreen
-    if (document.exitFullscreen) {
-        document.exitFullscreen();
+function handleFullscreenChange() {
+    if (!isExamMode) return; // Only act if in exam mode
+
+    if (!document.fullscreenElement) {
+        // User exited fullscreen
+        exitAttempts++;
+        currentExam.tentativas_de_sair = exitAttempts; // Update global counter
+        // Attempt to save the updated exit attempts (PUT request)
+        apiRequest('resposta', 'PUT', currentExam).catch(e => console.error('Failed to save exit attempt:', e));
+
+        showAlert('Aviso', `Você saiu do modo tela cheia. Tentativas de saída: ${exitAttempts}. Por favor, reative a tela cheia para continuar.`);
+        // Attempt to re-enter fullscreen automatically
+        try {
+            document.documentElement.requestFullscreen();
+        } catch (err) {
+            console.warn('Failed to re-enter fullscreen automatically:', err);
+        }
     }
-    
-    // Remove event listeners
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('contextmenu', handleContextMenu);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
 }
 
 function handleVisibilityChange() {
-    if (isExamMode && document.hidden) {
+    if (!isExamMode) return; // Only act if in exam mode
+
+    if (document.hidden) {
+        // User switched tabs or minimized window
         exitAttempts++;
-        showAlert('Aviso', 'Tentativa de sair da janela registrada. Mantenha-se na prova.');
+        currentExam.tentativas_de_sair = exitAttempts; // Update global counter
+        // Attempt to save the updated exit attempts (PUT request)
+        apiRequest('resposta', 'PUT', currentExam).catch(e => console.error('Failed to save exit attempt:', e));
+
+        showAlert('Aviso', `Você trocou de aba ou minimizou a janela. Tentativas de saída: ${exitAttempts}.`);
     }
 }
 
 function handleKeyDown(event) {
-    if (isExamMode) {
-        // Block common cheating attempts
-        if (event.key === 'Tab' || 
-            (event.ctrlKey && event.key === 'c') || 
-            (event.ctrlKey && event.key === 'v') || 
-            (event.ctrlKey && event.key === 'a') || 
-            (event.ctrlKey && event.key === 'x') ||
-            (event.ctrlKey && event.shiftKey && event.key === 'V') // Block CTRL+SHIFT+V
-        ) {
-            event.preventDefault();
-            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
-        }
-        
-        // Block F12, F5, etc.
-        if (event.key === 'F12' || event.key === 'F5' || 
-            (event.ctrlKey && event.shiftKey && event.key === 'I')) {
-            event.preventDefault();
-            showAlert('Bloqueado', 'Esta ação não é permitida durante a prova.');
-        }
+    if (!isExamMode) return; // Only block keys in exam mode
+
+    // Block common cheating shortcuts
+    const blockedKeys = [
+        'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+        'Tab', 'Alt', 'Control', 'Meta', // Basic blocking for Alt/Ctrl/Meta keys
+        'PrintScreen', 'Insert', 'Home', 'End', 'PageUp', 'PageDown'
+    ];
+
+    if (blockedKeys.includes(event.key) ||
+        (event.ctrlKey && event.key === 'c') || // Ctrl+C
+        (event.ctrlKey && event.key === 'v') || // Ctrl+V
+        (event.ctrlKey && event.key === 'x') || // Ctrl+X
+        (event.ctrlKey && event.key === 'a') || // Ctrl+A
+        (event.ctrlKey && event.key === 'p') || // Ctrl+P
+        (event.ctrlKey && event.key === 's') || // Ctrl+S
+        (event.ctrlKey && event.shiftKey && event.key === 'I') || // Ctrl+Shift+I (DevTools)
+        (event.ctrlKey && event.shiftKey && event.key === 'J') || // Ctrl+Shift+J (DevTools)
+        (event.ctrlKey && event.shiftKey && event.key === 'C') || // Ctrl+Shift+C (DevTools)
+        (event.ctrlKey && event.shiftKey && event.key === 'V') || // Ctrl+Shift+V (Paste)
+        (event.metaKey && event.key === 'c') || // Cmd+C (Mac)
+        (event.metaKey && event.key === 'v') || // Cmd+V (Mac)
+        (event.metaKey && event.key === 'x') || // Cmd+X (Mac)
+        (event.metaKey && event.key === 'a') || // Cmd+A (Mac)
+        (event.metaKey && event.key === 'p') || // Cmd+P (Mac)
+        (event.metaKey && event.key === 's')    // Cmd+S (Mac)
+    ) {
+        event.preventDefault();
+        showAlert('Aviso de Segurança', 'Esta ação é restrita durante a prova.');
     }
 }
 
 function handleContextMenu(event) {
     if (isExamMode) {
         event.preventDefault();
-        showAlert('Bloqueado', 'Menu de contexto não é permitido durante a prova.');
+        showAlert('Aviso de Segurança', 'O menu de contexto está desativado durante a prova.');
     }
 }
 
 function handleBeforeUnload(event) {
     if (isExamMode) {
         event.preventDefault();
-        event.returnValue = '';
-        return '';
-    }
-}
-
-function handleFullscreenChange() {
-    if (!document.fullscreenElement && isExamMode) {
-        exitAttempts++;
-        showAlert("Aviso", "Você saiu do modo tela cheia. Evento registrado pelo WM Prova Online. Tentando retornar ao modo tela cheia...");
-        try {
-            document.documentElement.requestFullscreen();
-        } catch (err) {
-            console.warn("Failed to re-enter fullscreen:", err);
-        }
+        event.returnValue = ''; // Modern browsers require this for custom message
+        return ''; // For older browsers
     }
 }
 
 // Event Listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Navigation buttons
-    document.getElementById('professorLoginBtn').addEventListener('click', () => {
-        showScreen('professorLoginScreen');
+document.addEventListener('DOMContentLoaded', () => {
+    // Assign event listeners to buttons and forms
+    document.getElementById('professorLoginBtn').addEventListener('click', async () => {
+        const usuario = document.getElementById('professorUser').value;
+        const senha = document.getElementById('professorPass').value;
+        await loginProfessor(usuario, senha);
     });
-    
-    document.getElementById('studentAccessBtn').addEventListener('click', () => {
-        showScreen('studentAccessScreen');
-    });
-    
-    document.getElementById('backToHomeFromLogin').addEventListener('click', () => {
-        showScreen('homeScreen');
-    });
-    
-    document.getElementById('backToHomeFromStudent').addEventListener('click', () => {
-        showScreen('homeScreen');
-    });
-    
-    document.getElementById('backToHomeFromResult').addEventListener('click', () => {
-        showScreen('homeScreen');
-        currentExam = null;
-        studentAnswers = {};
-        exitAttempts = 0;
-    });
-    
-    document.getElementById('logoutBtn').addEventListener('click', () => {
+
+    document.getElementById('professorLogoutBtn').addEventListener('click', () => {
         currentUser = null;
         hideUserInfo();
-        showScreen('homeScreen');
+        showScreen('welcomeScreen');
+        document.getElementById('professorUser').value = '';
+        document.getElementById('professorPass').value = '';
     });
-    
-    // Professor login form
-    document.getElementById('professorLoginForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        await loginProfessor(formData.get('usuario'), formData.get('senha'));
+
+    document.getElementById('showProfessorLogin').addEventListener('click', () => showScreen('professorLogin'));
+    document.getElementById('showStudentAccess').addEventListener('click', () => showScreen('studentAccess'));
+
+    // Dashboard Tabs
+    document.getElementById('tabProvas').addEventListener('click', () => {
+        showTab('provas');
+        loadProvas();
     });
-    
-    // Student access form
-    document.getElementById('studentAccessForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        
-        const cpf = formData.get('cpf').replace(/[^\d]/g, '');
-        if (!validateCPF(cpf)) {
-            showAlert('Erro', 'CPF inválido.');
-            return;
-        }
-        
-        const studentData = {
-            nome: formData.get('nome'),
-            email: formData.get('email'),
-            cpf: cpf
-        };
-        
-        await startExam(studentData);
-    });
-    
-    // Dashboard tabs
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabName = btn.dataset.tab;
-            
-            // Update tab buttons
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            
-            // Update tab content
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            document.getElementById(tabName + 'Tab').classList.add('active');
-        });
-    });
-    
-    // Prova form
-    document.getElementById('addProvaBtn').addEventListener('click', () => {
-        showProvaForm();
-    });
-    
-    document.getElementById('cancelProvaForm').addEventListener('click', () => {
-        hideProvaForm();
-    });
-    
-    document.getElementById('provaFormElement').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
+    document.getElementById('tabQuestoes').addEventListener('click', () => showTab('questoes'));
+    document.getElementById('tabRespostas').addEventListener('click', () => showTab('respostas'));
+
+    // Prova Management
+    document.getElementById('newProvaBtn').addEventListener('click', () => showProvaForm());
+    document.getElementById('provaFormElement').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
         await saveProva(formData);
     });
-    
-    // Questoes tab
-    document.getElementById('provaSelectQuestoes').addEventListener('change', (e) => {
-        loadQuestoes(e.target.value);
-    });
-    
-    document.getElementById('addQuestaoBtn').addEventListener('click', () => {
-        showQuestaoForm();
-    });
-    
-    document.getElementById('cancelQuestaoForm').addEventListener('click', () => {
-        hideQuestaoForm();
-    });
-    
-    document.getElementById('questaoFormElement').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
+    document.getElementById('cancelProvaFormBtn').addEventListener('click', hideProvaForm);
+
+    // Questao Management
+    document.getElementById('newQuestaoBtn').addEventListener('click', () => showQuestaoForm());
+    document.getElementById('questaoFormElement').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
         await saveQuestao(formData);
     });
-    
-    document.getElementById('questaoTipo').addEventListener('change', (e) => {
-        if (e.target.value === 'objetiva') {
-            document.getElementById('objectiveOptions').style.display = 'block';
-            document.getElementById('correctAnswer').style.display = 'block';
+    document.getElementById('cancelQuestaoFormBtn').addEventListener('click', hideQuestaoForm);
+    document.getElementById('questaoTipo').addEventListener('change', (event) => toggleObjectiveOptions(event.target.value));
+
+    // Student Access
+    document.getElementById('studentProvaSelect').addEventListener('change', async (event) => {
+        const provaId = event.target.value;
+        if (provaId) {
+            const provas = await apiRequest('prova');
+            if (provas && provas.data) {
+                const prova = provas.data.find(p => p.id_prova == provaId);
+                if (prova) {
+                    document.getElementById('studentProvaTitle').textContent = prova.titulo;
+                    document.getElementById('studentProvaDetails').innerHTML = `
+                        <p>Início: ${formatDateTime(prova.data_inicio)}</p>
+                        <p>Fim: ${formatDateTime(prova.data_fim)}</p>
+                        <p>Duração: ${prova.duracao_minutos} minutos</p>
+                    `;
+                }
+            }
         } else {
-            document.getElementById('objectiveOptions').style.display = 'none';
-            document.getElementById('correctAnswer').style.display = 'none';
+            document.getElementById('studentProvaTitle').textContent = '';
+            document.getElementById('studentProvaDetails').innerHTML = '';
         }
     });
 
-    // Respostas tab
-    document.getElementById('provaSelectRespostas').addEventListener('change', (e) => {
-        loadRespostas(e.target.value);
+    document.getElementById('startExamBtn').addEventListener('click', startExam);
+    document.getElementById('cancelStudentAccessBtn').addEventListener('click', () => showScreen('welcomeScreen'));
+
+    // Exam Screen
+    document.getElementById('finishExamBtn').addEventListener('click', () => {
+        showConfirm('Finalizar Prova', 'Tem certeza que deseja finalizar a prova? Você não poderá alterá-la depois.', (confirmed) => {
+            if (confirmed) {
+                finishExam();
+            }
+        });
     });
 
-    // Initial screen setup
-    showScreen('homeScreen');
+    // Result Screen
+    document.getElementById('backToWelcomeBtn').addEventListener('click', () => showScreen('welcomeScreen'));
+
+    // Initial load
+    showScreen('welcomeScreen');
+    loadStudentProvas();
 });
 
-// Initial setup (This line is redundant if called inside DOMContentLoaded)
-// showScreen('homeScreen');
+function showTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+    document.getElementById(`tab${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.add('active');
+    document.getElementById(`${tabName}TabContent`).classList.add('active');
+
+    if (tabName === 'provas') {
+        loadProvas();
+    } else if (tabName === 'questoes') {
+        const provaId = document.getElementById('provaSelectQuestoes').value;
+        loadQuestoes(provaId);
+    } else if (tabName === 'respostas') {
+        const provaId = document.getElementById('provaSelectRespostas').value;
+        loadRespostas(provaId);
+    }
+}
+
+async function loadStudentProvas() {
+    const provas = await apiRequest('prova');
+    if (!provas || !provas.data) return;
+
+    const studentProvaSelect = document.getElementById('studentProvaSelect');
+    studentProvaSelect.innerHTML = '<option value="">Selecione uma prova</option>';
+
+    const now = new Date();
+    provas.data.forEach(prova => {
+        const startDate = new Date(prova.data_inicio);
+        const endDate = new Date(prova.data_fim);
+
+        // Only show active or scheduled exams to students
+        if (now >= startDate && now <= endDate) {
+            const option = document.createElement('option');
+            option.value = prova.id_prova;
+            option.textContent = prova.titulo;
+            studentProvaSelect.appendChild(option);
+        }
+    });
+}
+
+// Add event listener for professor dashboard tab changes
+document.getElementById('provaSelectQuestoes').addEventListener('change', (event) => {
+    loadQuestoes(event.target.value);
+});
+document.getElementById('provaSelectRespostas').addEventListener('change', (event) => {
+    loadRespostas(event.target.value);
+});
+
+// Initial setup
+showScreen('welcomeScreen');
+loadStudentProvas();
 
 
