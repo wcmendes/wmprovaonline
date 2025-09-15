@@ -13,7 +13,7 @@
             <h1 class="logo">WM Prova Online</h1>
             <div class="user-info" id="userInfo" style="display: none;">
                 <span id="userName"></span>
-                <button id="professorLogoutBtn" class="btn btn-secondary">Sair</button>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
             </div>
         </div>
     </header>
@@ -22,13 +22,13 @@
     <main class="main">
         <div class="container">
             <!-- Home Screen -->
-            <div id="welcomeScreen" class="screen active">
+            <div id="homeScreen" class="screen active">
                 <div class="welcome-card">
                     <h2>Bem-vindo ao WM Prova Online</h2>
                     <p>Sistema de provas online para professores e alunos</p>
                     <div class="button-group">
-                        <button id="showProfessorLogin" class="btn btn-primary">Login Professor</button>
-                        <button id="showStudentAccess" class="btn btn-primary">Acesso do Aluno</button>
+                        <button id="professorLoginBtn" class="btn btn-primary">Login Professor</button>
+                        <button id="studentAccessBtn" class="btn btn-primary">Acesso do Aluno</button>
                     </div>
                 </div>
             </div>
@@ -44,11 +44,11 @@
                         </div>
                         <div class="form-group">
                             <label for="professorPassword">Senha:</label>
-                            <input type="password" id="professorPass" name="senha" required>
+                            <input type="password" id="professorPassword" name="senha" required>
                         </div>
                         <div class="button-group">
                             <button type="submit" class="btn btn-primary">Entrar</button>
-                            <button type="button" id="backToHomeFromLogin" class="btn btn-secondary" onclick="showScreen('welcomeScreen')">Voltar</button>
+                            <button type="button" id="backToHomeFromLogin" class="btn btn-secondary">Voltar</button>
                         </div>
                     </form>
                 </div>
@@ -59,16 +59,16 @@
                 <div class="dashboard">
                     <h2>Dashboard do Professor</h2>
                     <div class="dashboard-tabs">
-                        <button id="tabProvas" class="tab-btn active" data-tab="provas">Provas</button>
-                        <button id="tabQuestoes" class="tab-btn" data-tab="questoes">Questões</button>
-                        <button id="tabRespostas" class="tab-btn" data-tab="respostas">Respostas</button>
+                        <button class="tab-btn active" data-tab="provas">Provas</button>
+                        <button class="tab-btn" data-tab="questoes">Questões</button>
+                        <button class="tab-btn" data-tab="respostas">Respostas</button>
                     </div>
 
                     <!-- Provas Tab -->
-                    <div id="provasTabContent" class="tab-content active">
+                    <div id="provasTab" class="tab-content active">
                         <div class="tab-header">
                             <h3>Gerenciar Provas</h3>
-                            <button id="newProvaBtn" class="btn btn-primary">Nova Prova</button>
+                            <button id="addProvaBtn" class="btn btn-primary">Nova Prova</button>
                         </div>
                         <div id="provasList" class="items-list"></div>
                         
@@ -104,7 +104,7 @@
                                     </div>
                                     <div class="button-group">
                                         <button type="submit" class="btn btn-primary">Salvar</button>
-                                        <button type="button" id="cancelProvaFormBtn" class="btn btn-secondary">Cancelar</button>
+                                        <button type="button" id="cancelProvaForm" class="btn btn-secondary">Cancelar</button>
                                     </div>
                                 </form>
                             </div>
@@ -112,13 +112,13 @@
                     </div>
 
                     <!-- Questões Tab -->
-                    <div id="questoesTabContent" class="tab-content">
+                    <div id="questoesTab" class="tab-content">
                         <div class="tab-header">
                             <h3>Gerenciar Questões</h3>
                             <select id="provaSelectQuestoes" class="form-select">
                                 <option value="">Selecione uma prova</option>
                             </select>
-                            <button id="newQuestaoBtn" class="btn btn-primary" disabled>Nova Questão</button>
+                            <button id="addQuestaoBtn" class="btn btn-primary" disabled>Nova Questão</button>
                         </div>
                         <div id="questoesList" class="items-list"></div>
                         
@@ -140,7 +140,7 @@
                                         <label for="questaoEnunciado">Enunciado:</label>
                                         <textarea id="questaoEnunciado" name="enunciado" rows="3" required></textarea>
                                     </div>
-                                    <div id="objectiveOptions">
+                                    <div id="opcoesObjetivas">
                                         <div class="form-group">
                                             <label for="opcaoA">Opção A:</label>
                                             <input type="text" id="opcaoA" name="opcao_a">
@@ -178,7 +178,7 @@
                                     </div>
                                     <div class="button-group">
                                         <button type="submit" class="btn btn-primary">Salvar</button>
-                                        <button type="button" id="cancelQuestaoFormBtn" class="btn btn-secondary">Cancelar</button>
+                                        <button type="button" id="cancelQuestaoForm" class="btn btn-secondary">Cancelar</button>
                                     </div>
                                 </form>
                             </div>
@@ -186,7 +186,7 @@
                     </div>
 
                     <!-- Respostas Tab -->
-                    <div id="respostasTabContent" class="tab-content">
+                    <div id="respostasTab" class="tab-content">
                         <div class="tab-header">
                             <h3>Respostas dos Alunos</h3>
                             <select id="provaSelectRespostas" class="form-select">
@@ -215,19 +215,9 @@
                             <label for="studentCPF">CPF:</label>
                             <input type="text" id="studentCPF" name="cpf" required maxlength="14" placeholder="000.000.000-00">
                         </div>
-                        <div class="form-group">
-                            <label for="studentProvaSelect">Selecione a Prova:</label>
-                            <select id="studentProvaSelect" name="id_prova" required>
-                                <option value="">Selecione uma prova</option>
-                            </select>
-                        </div>
-                        <div id="studentProvaInfo" style="margin-top: 1rem;">
-                            <h4 id="studentProvaTitle"></h4>
-                            <div id="studentProvaDetails"></div>
-                        </div>
                         <div class="button-group">
-                            <button type="button" id="startExamBtn" class="btn btn-primary">Iniciar Prova</button>
-                            <button type="button" id="cancelStudentAccessBtn" class="btn btn-secondary">Voltar</button>
+                            <button type="submit" class="btn btn-primary">Iniciar Prova</button>
+                            <button type="button" id="backToHomeFromStudent" class="btn btn-secondary">Voltar</button>
                         </div>
                     </form>
                 </div>
@@ -241,7 +231,6 @@
                         <div class="timer-container">
                             <span class="timer-label">Tempo restante:</span>
                             <span id="timer" class="timer">00:00:00</span>
-                            <span id="examTimer" class="timer" style="display:none;">00:00:00</span>
                         </div>
                     </div>
                     
@@ -257,10 +246,9 @@
                     </div>
 
                     <div id="examQuestions" class="exam-questions"></div>
-                    <div id="examQuestionsContainer" class="exam-questions"></div>
 
                     <div class="exam-footer">
-                        <button id="finishExamBtn" class="btn btn-primary">Finalizar Prova</button>
+                        <button id="submitExamBtn" class="btn btn-primary">Finalizar Prova</button>
                     </div>
                 </div>
             </div>
@@ -270,11 +258,9 @@
                 <div class="result-card">
                     <h2>Prova Finalizada</h2>
                     <div class="result-message">
-                        <h3 id="resultProvaTitle"></h3>
                         <p id="resultMessage">Prova finalizada com sucesso!</p>
-                        <p>Sua nota final: <span id="resultNotaFinal"></span></p>
                     </div>
-                    <button id="backToWelcomeBtn" class="btn btn-primary">Voltar ao Início</button>
+                    <button id="backToHomeFromResult" class="btn btn-primary">Voltar ao Início</button>
                 </div>
             </div>
         </div>
@@ -315,6 +301,7 @@
         </div>
     </div>
 
-    <script src="script.js" defer></script>
+    <script src="script.js"></script>
 </body>
 </html>
+
