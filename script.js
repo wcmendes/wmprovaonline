@@ -769,7 +769,11 @@ async function startExam() {
         startExamTimer();
         
         // Enable exam mode (fullscreen, anti-cheat)
-        await enableExamMode();
+        const examModeEnabled = await enableExamMode();
+        if (!examModeEnabled) {
+            hideLoading();
+            return; // Exit if exam mode couldn't be enabled
+        }
         showScreen('examScreen');
 
     } catch (error) {
@@ -863,8 +867,12 @@ function startExamTimer() {
 
 function saveStudentAnswer(questionId, answer) {
     studentAnswers[questionId] = answer;
-    // Optionally save answers to API periodically or on blur
-    // For now, only save on finishExam
+    // Update currentExam respostas object to keep it in sync
+    if (currentExam) {
+        if (!currentExam.respostas) currentExam.respostas = {};
+        currentExam.respostas[questionId] = answer;
+    }
+    // Only save to API when exam is finished to avoid duplicate spreadsheet entries
 }
 
 async function finishExam(autoSubmit = false) {
@@ -904,18 +912,99 @@ async function finishExam(autoSubmit = false) {
     currentExam.nota_discursiva = notaDiscursiva; // Placeholder
     currentExam.nota_final = notaObjetiva + notaDiscursiva; // Placeholder
 
-    // Send updated response to API (PUT request)
-    const result = await apiRequest('resposta', 'PUT', currentExam);
-
+    // Send final updated response to API (PUT request)
+    // This is the only PUT call to avoid creating duplicate spreadsheet entries
+    let result = null;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries && (!result || !result.success)) {
+        try {
+            if (retryCount > 0) {
+                showAlert('Salvando...', `Tentativa ${retryCount + 1}/${maxRetries}...`);
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+            }
+            result = await apiRequest('resposta', 'PUT', currentExam);
+            if (result && result.success) {
+                break;
+            }
+        } catch (error) {
+            console.error(`Erro na tentativa ${retryCount + 1}:`, error);
+        }
+        retryCount++;
+    }
+    
     if (result && result.success) {
+        // Store backup in localStorage as additional safety
+        try {
+            localStorage.setItem('examBackup_' + currentExam.id_resposta, JSON.stringify({
+                currentExam,
+                savedAt: new Date().toISOString(),
+                status: 'completed'
+            }));
+        } catch (e) {
+            console.warn('Could not save local backup:', e);
+        }
+        
         showAlert('Prova Finalizada', 'Suas respostas foram enviadas com sucesso!');
         showScreen('resultScreen');
         document.getElementById('resultProvaTitle').textContent = currentExam.nome + ' - ' + document.getElementById('examTitle').textContent;
         document.getElementById('resultNotaFinal').textContent = currentExam.nota_final;
     } else {
-        showAlert('Erro', 'Erro ao finalizar a prova. Por favor, tente novamente.');
+        // Save to localStorage as backup if API fails completely
+        try {
+            localStorage.setItem('examBackup_' + currentExam.id_resposta, JSON.stringify({
+                currentExam,
+                savedAt: new Date().toISOString(),
+                status: 'failed_upload',
+                retries: retryCount
+            }));
+            showAlert('Aviso', 'Não foi possível enviar suas respostas após ' + maxRetries + ' tentativas. Suas respostas foram salvas localmente. Favor contactar o professor.');
+        } catch (e) {
+            showAlert('Erro Crítico', 'Não foi possível salvar suas respostas. Por favor, tire uma captura de tela e contacte o professor imediatamente.');
+        }
     }
     hideLoading();
+}
+
+// Exam Interaction Control
+function disableExamInteractions() {
+    const examScreen = document.getElementById('examScreen');
+    if (examScreen) {
+        const inputs = examScreen.querySelectorAll('input, textarea, button');
+        inputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+        });
+        // Add overlay to prevent any interactions
+        const overlay = document.createElement('div');
+        overlay.id = 'fullscreenWarningOverlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255,0,0,0.3); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px; font-weight: bold; color: white;
+            text-align: center; backdrop-filter: blur(3px);
+        `;
+        overlay.innerHTML = '<div>⚠️<br>TELA CHEIA OBRIGATÓRIA<br>⚠️</div>';
+        document.body.appendChild(overlay);
+    }
+}
+
+function enableExamInteractions() {
+    const examScreen = document.getElementById('examScreen');
+    if (examScreen) {
+        const inputs = examScreen.querySelectorAll('input, textarea, button');
+        inputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+        });
+        // Remove overlay
+        const overlay = document.getElementById('fullscreenWarningOverlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
 }
 
 // Anti-cheat and Fullscreen Functions
@@ -923,12 +1012,31 @@ async function enableExamMode() {
     isExamMode = true;
     document.body.classList.add('exam-mode');
     
-    // Request fullscreen
+    // Request fullscreen with user confirmation if automatic fails
     try {
         await document.documentElement.requestFullscreen();
     } catch (err) {
         console.warn('Failed to enter fullscreen:', err);
-        showAlert('Aviso', 'Não foi possível entrar em modo tela cheia automaticamente. Por favor, ative manualmente para continuar a prova.');
+        const userConfirm = confirm('É obrigatório estar em tela cheia para fazer a prova. Clique OK para ativar tela cheia manualmente ou Cancelar para sair.');
+        if (userConfirm) {
+            try {
+                await document.documentElement.requestFullscreen();
+            } catch (err2) {
+                showAlert('Erro', 'Não foi possível ativar tela cheia. Você não poderá fazer a prova.');
+                showScreen('welcomeScreen');
+                return false;
+            }
+        } else {
+            showScreen('welcomeScreen');
+            return false;
+        }
+    }
+    
+    // Verify fullscreen is active
+    if (!document.fullscreenElement) {
+        showAlert('Erro', 'Tela cheia é obrigatória. A prova será cancelada.');
+        showScreen('welcomeScreen');
+        return false;
     }
     
     // Add event listeners for security
@@ -937,25 +1045,31 @@ async function enableExamMode() {
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return true;
 }
 
 function handleFullscreenChange() {
     if (!isExamMode) return; // Only act if in exam mode
 
     if (!document.fullscreenElement) {
-        // User exited fullscreen
+        // User exited fullscreen - disable all exam interactions
+        disableExamInteractions();
         exitAttempts++;
         currentExam.tentativas_de_sair = exitAttempts; // Update global counter
-        // Attempt to save the updated exit attempts (PUT request)
-        apiRequest('resposta', 'PUT', currentExam).catch(e => console.error('Failed to save exit attempt:', e));
+        // Note: Exit attempts will be saved only when exam is finished
+        // Avoiding multiple PUT requests to prevent duplicate spreadsheet entries
 
-        showAlert('Aviso', `Você saiu do modo tela cheia. Tentativas de saída: ${exitAttempts}. Por favor, reative a tela cheia para continuar.`);
+        showAlert('Aviso', `Você saiu do modo tela cheia. Tentativas de saída: ${exitAttempts}. Todas as interações estão desabilitadas. Por favor, reative a tela cheia para continuar.`);
         // Attempt to re-enter fullscreen automatically
         try {
             document.documentElement.requestFullscreen();
         } catch (err) {
             console.warn('Failed to re-enter fullscreen automatically:', err);
         }
+    } else {
+        // Re-entered fullscreen - enable exam interactions
+        enableExamInteractions();
     }
 }
 
@@ -966,8 +1080,8 @@ function handleVisibilityChange() {
         // User switched tabs or minimized window
         exitAttempts++;
         currentExam.tentativas_de_sair = exitAttempts; // Update global counter
-        // Attempt to save the updated exit attempts (PUT request)
-        apiRequest('resposta', 'PUT', currentExam).catch(e => console.error('Failed to save exit attempt:', e));
+        // Note: Exit attempts will be saved only when exam is finished
+        // Avoiding multiple PUT requests to prevent duplicate spreadsheet entries
 
         showAlert('Aviso', `Você trocou de aba ou minimizou a janela. Tentativas de saída: ${exitAttempts}.`);
     }
@@ -1161,5 +1275,3 @@ document.getElementById('provaSelectRespostas').addEventListener('change', (even
 // Initial setup
 showScreen('welcomeScreen');
 loadStudentProvas();
-
-
