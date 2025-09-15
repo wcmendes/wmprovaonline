@@ -1264,10 +1264,16 @@ async function loadStudentProvas() {
     });
 }
 
-// Add event listener for professor dashboard tab changes
-document.getElementById('provaSelectQuestoes').addEventListener('change', (event) => {
-    loadQuestoes(event.target.value);
-});
-document.getElementById('provaSelectRespostas').addEventListener('change', (event) => {
-    loadRespostas(event.target.value);
-});
+const provaQuestoesEl = document.getElementById('provaSelectQuestoes');
+if (provaQuestoesEl) {
+    provaQuestoesEl.addEventListener('change', (event) => {
+        loadQuestoes(event.target.value);
+    });
+}
+
+const provaRespostasEl = document.getElementById('provaSelectRespostas');
+if (provaRespostasEl) {
+    provaRespostasEl.addEventListener('change', (event) => {
+        loadRespostas(event.target.value);
+    });
+}
