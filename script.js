@@ -1271,7 +1271,3 @@ document.getElementById('provaSelectQuestoes').addEventListener('change', (event
 document.getElementById('provaSelectRespostas').addEventListener('change', (event) => {
     loadRespostas(event.target.value);
 });
-
-// Initial setup
-showScreen('welcomeScreen');
-loadStudentProvas();
