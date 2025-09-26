@@ -537,31 +537,50 @@ async function deleteQuestao(id) {
 
 // Responses Management
 async function loadRespostas(provaId) {
+    document.getElementById('respostasList').innerHTML = '<h4>Carregando respostas...</h4>';
     if (!provaId) {
         document.getElementById('respostasList').innerHTML = '';
         return;
     }
 
+    // Limpa o console para uma leitura clara
+    console.clear(); 
+    console.log("--- INICIANDO DIAGNÓSTICO DAS RESPOSTAS ---");
+
     const respostas = await apiRequest('resposta');
     if (!respostas || !respostas.data) {
-        document.getElementById('respostasList').innerHTML = '<p>Nenhuma resposta encontrada.</p>';
+        console.error("ERRO: A chamada para a API de 'resposta' falhou ou não retornou dados.");
         return;
     }
 
-    // CORREÇÃO DEFINITIVA: Usamos '==' para comparar o texto do menu com o número da planilha.
-    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
+    console.log(`PASSO 1: O ID da prova selecionada no menu é: "${provaId}" (O tipo dele é: ${typeof provaId})`);
+    console.log("PASSO 2: Total de respostas recebidas da planilha:", respostas.data.length);
+    console.log("Abaixo estão as 5 primeiras linhas de dados da planilha 'resposta' para análise:");
     
+    // Mostra os dados em uma tabela fácil de ler no console
+    console.table(respostas.data.slice(0, 5)); 
+
+    console.log("PASSO 3: Iniciando o filtro para encontrar as respostas da prova selecionada...");
+    const provaRespostas = respostas.data.filter(r => {
+        // Esta comparação é a parte crucial que está falhando
+        return String(r.id_prova).trim() == String(provaId).trim();
+    });
+    
+    console.log(`PASSO 4: O filtro encontrou ${provaRespostas.length} resposta(s) para esta prova.`);
+
     const respostasList = document.getElementById('respostasList');
     respostasList.innerHTML = '';
 
     if (provaRespostas.length === 0) {
-        respostasList.innerHTML = '<p>Nenhuma resposta encontrada para esta prova. Verifique a planilha.</p>';
+        respostasList.innerHTML = '<h4>Diagnóstico: Nenhuma resposta encontrada após o filtro. Verifique os dados no console acima para encontrar a diferença.</h4>';
     } else {
+        respostasList.innerHTML = `<h4>Diagnóstico: ${provaRespostas.length} respostas encontradas! Renderizando...</h4>`;
         provaRespostas.forEach(resposta => {
             const respostaCard = createRespostaCard(resposta);
             respostasList.appendChild(respostaCard);
         });
     }
+    console.log("--- FIM DO DIAGNÓSTICO ---");
 }
 
 function createRespostaCard(resposta) {
