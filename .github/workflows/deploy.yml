@@ -3,7 +3,11 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main  # Ou a branch que você usa como principal
+      - main # Roda sempre que houver uma atualização na branch 'main'
+
+# Adiciona as permissões necessárias para o robô modificar o repositório
+permissions:
+  contents: write
 
 jobs:
   build-and-deploy:
@@ -20,4 +24,4 @@ jobs:
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages # A branch onde o site será publicado
-          folder: . # Publica a raiz do projeto
+          folder: . # Publica a raiz do projeto (incluindo o novo config.js)
