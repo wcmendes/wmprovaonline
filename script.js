@@ -13,6 +13,8 @@ let studentResponseId = null;
 let currentStudentResponse = null;
 let exitAttempts = 0;
 let isExamMode = false;
+let initialGracePeriod = false; 
+let lastExitTimestamp = 0;      
 
 // API Configuration
 const API_BASE = 'https://script.google.com/macros/s/AKfycbwr4CwGenJ8Gf10svE3zOA_QiQJ3kAyZ9KyqNUT0NGQkImmJ68MkOX_tZnjFCJOD8XA/exec';
@@ -792,37 +794,62 @@ function checkFullscreen() {
     }
 }
 
+// NOVA FUNÇÃO para centralizar a contagem
+function incrementExitCounter() {
+    if (!isExamMode || initialGracePeriod) return;
+
+    const now = Date.now();
+    // Impede que múltiplos eventos (blur, visibilitychange) contem como saídas separadas
+    if (now - lastExitTimestamp < 1500) {
+        return;
+    }
+    lastExitTimestamp = now;
+
+    exitAttempts++;
+    showAlert('Aviso', `Você saiu da janela ou do modo tela cheia ${exitAttempts} vez(es). O número de saídas será levado em consideração na correção da prova.`);
+}
+
 /**
  * Função ATUALIZADA para habilitar o modo de prova.
  * Agora adiciona listeners para o evento 'fullscreenchange'.
  */
+// Função ATUALIZADA para habilitar o modo de prova
 function enableExamMode() {
     isExamMode = true;
+    initialGracePeriod = true;
+    lastExitTimestamp = 0;
+    setTimeout(() => { initialGracePeriod = false; }, 3000); // Período de carência de 3s
+
     document.body.classList.add('exam-mode');
     
-    // Tenta entrar em tela cheia
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(err => {
             console.warn("Navegador impediu a tela cheia automática.");
         });
     }
     
-    // Adiciona os listeners de segurança
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Listeners de Segurança
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // **A MUDANÇA MAIS IMPORTANTE ESTÁ AQUI**
-    // Adiciona listeners que reagem instantaneamente à mudança de tela cheia
-    document.addEventListener('fullscreenchange', checkFullscreen);
-    document.addEventListener('webkitfullscreenchange', checkFullscreen); // Para compatibilidade com Safari/Chrome antigo
+    // Listeners para detectar a saída do aluno
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) incrementExitCounter();
+    });
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) incrementExitCounter();
+        checkFullscreen(); // Esta função agora SÓ cuida do aviso visual
+    });
+    document.addEventListener('webkitfullscreenchange', () => { // Compatibilidade
+        if (!document.webkitFullscreenElement) incrementExitCounter();
+        checkFullscreen();
+    });
 
-    // O intervalo agora serve apenas como uma garantia extra
+    // Verificação contínua para o aviso visual
     if (fullscreenCheckInterval) clearInterval(fullscreenCheckInterval);
-    fullscreenCheckInterval = setInterval(checkFullscreen, 1000);
+    fullscreenCheckInterval = setInterval(checkFullscreen, 500);
     
-    // Roda a verificação uma vez no início para garantir o estado correto
     checkFullscreen();
 }
 
@@ -947,7 +974,7 @@ async function finishExam(autoFinish = false) {
     // Update response
     const updateData = {
         ...currentStudentResponse, // Começa com todos os dados originais do aluno
-        id_resposta: studentResponseId,
+        id_resposta: studentResponseId, 
         respostas: JSON.stringify(studentAnswers),
         hora_fim: new Date().toISOString(),
         nota_objetiva: objectiveScore,
@@ -1126,26 +1153,39 @@ window.saveAnswer = saveAnswer;
 
 // Additional functions for viewing responses and editing discursive grades
 async function viewRespostas(respostaId) {
+    showLoading(); // Mostra o loading
     const respostas = await apiRequest('resposta');
-    if (!respostas || !respostas.data) return;
-    
+    const questoes = await apiRequest('questao');
+    hideLoading(); // Esconde o loading
+
+    if (!respostas || !respostas.data || !questoes || !questoes.data) {
+        showAlert('Erro', 'Não foi possível carregar os dados da prova.');
+        return;
+    }
+
     const resposta = respostas.data.find(r => r.id_resposta == respostaId);
     if (!resposta) return;
-    
-    const questoes = await apiRequest('questao');
-    if (!questoes || !questoes.data) return;
-    
+
     const provaQuestoes = questoes.data.filter(q => q.id_prova == resposta.id_prova);
-    const respostasData = JSON.parse(resposta.respostas || '{}');
+    
+    let respostasData = {};
+    try {
+        // Tenta interpretar o JSON das respostas
+        respostasData = JSON.parse(resposta.respostas || '{}');
+    } catch (e) {
+        console.error("Erro ao processar JSON das respostas:", resposta.respostas);
+        // Se falhar, o objeto continuará vazio, mas a função não vai quebrar
+    }
     
     const modalContentEl = document.getElementById('viewResponseContent');
     let modalContent = `
         <h3>Respostas de ${resposta.nome}</h3>
-        <div style="max-height: 70vh; overflow-y: auto;">
+        <div style="max-height: 70vh; overflow-y: auto; text-align: left;">
     `;
     
     provaQuestoes.forEach((questao, index) => {
-        const respAluno = respostasData[questao.id_questao] || 'Não respondida';
+        const respAluno = respostasData[questao.id_questao] || '<i>Não respondida ou com erro de formatação.</i>';
+        
         modalContent += `
             <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
                 <h4>Questão ${index + 1} (${questao.tipo})</h4>
@@ -1159,7 +1199,7 @@ async function viewRespostas(respostaId) {
     
     modalContent += `
         </div>
-        <div class="button-group">
+        <div class="button-group" style="margin-top: 20px;">
             <button class="btn btn-secondary" onclick="closeViewRespostas()">Fechar</button>
         </div>
     `;
