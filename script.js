@@ -544,23 +544,18 @@ async function loadRespostas(provaId) {
 
     const respostas = await apiRequest('resposta');
     if (!respostas || !respostas.data) {
-        // Limpa a lista se não houver dados
         document.getElementById('respostasList').innerHTML = '<p>Nenhuma resposta encontrada.</p>';
         return;
     }
 
-    // CORREÇÃO DEFINITIVA:
-    // Comparamos os IDs como texto e removemos espaços para garantir que "123" seja igual a " 123 ".
-    const provaRespostas = respostas.data.filter(r => {
-        // Verifica se r.id_prova existe antes de tentar comparar
-        return r.id_prova && String(r.id_prova).trim() == String(provaId).trim();
-    });
+    // CORREÇÃO DEFINITIVA: Usamos '==' para comparar o texto do menu com o número da planilha.
+    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
     
     const respostasList = document.getElementById('respostasList');
     respostasList.innerHTML = '';
 
     if (provaRespostas.length === 0) {
-        respostasList.innerHTML = '<p>Nenhuma resposta encontrada para esta prova.</p>';
+        respostasList.innerHTML = '<p>Nenhuma resposta encontrada para esta prova. Verifique a planilha.</p>';
     } else {
         provaRespostas.forEach(resposta => {
             const respostaCard = createRespostaCard(resposta);
