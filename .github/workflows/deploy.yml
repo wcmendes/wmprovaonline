@@ -12,7 +12,7 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     
-    # Adicionamos este bloco para forçar a leitura do segredo
+    # Adicionamos este bloco para forçar a leitura do segredo para uma variável de ambiente
     env:
       API_KEY_SECRET: ${{ secrets.SECRET_API_SHEETS }}
 
@@ -20,8 +20,17 @@ jobs:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
+      - name: Verify Secret Presence 🕵️
+        run: |
+          if [ -z "${{ env.API_KEY_SECRET }}" ]; then
+            echo "::error::ERRO FATAL: O segredo SECRET_API_SHEETS está vazio ou não foi encontrado nas configurações do repositório."
+            exit 1
+          else
+            echo "Segredo encontrado com sucesso."
+          fi
+
       - name: Create config.js file 🤫
-        # Agora usamos a variável de ambiente que criamos acima
+        # Agora usamos a variável de ambiente que criamos e verificamos acima
         run: |
           echo "const API_KEY = '${{ env.API_KEY_SECRET }}';" > config.js
         
