@@ -767,63 +767,94 @@ function showExamScreen() {
     enableExamMode();
 }
 
+// Adicione esta variável no topo do seu script.js, junto com as outras
 let fullscreenCheckInterval = null;
 
+/**
+ * Função ATUALIZADA que verifica o estado da tela cheia.
+ * Agora ela será chamada pelo evento 'fullscreenchange' para uma resposta instantânea.
+ */
 function checkFullscreen() {
-    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
     const warningOverlay = document.getElementById('fullscreenWarning');
 
-    if (isExamMode && !isFullscreen) {
-        warningOverlay.style.display = 'flex';
-    } else if (warningOverlay) {
-        warningOverlay.style.display = 'none';
+    if (warningOverlay) {
+        // Se o modo de prova está ativo E não estamos em tela cheia, mostra o aviso.
+        if (isExamMode && !isFullscreen) {
+            warningOverlay.style.display = 'flex';
+        } else {
+            // Se o modo de prova não está ativo OU se já estamos em tela cheia, esconde o aviso.
+            warningOverlay.style.display = 'none';
+        }
     }
 }
 
+/**
+ * Função ATUALIZADA para habilitar o modo de prova.
+ * Agora adiciona listeners para o evento 'fullscreenchange'.
+ */
 function enableExamMode() {
     isExamMode = true;
     document.body.classList.add('exam-mode');
-
+    
     // Tenta entrar em tela cheia
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(err => {
-            console.warn("Não foi possível entrar em tela cheia automaticamente.");
+            console.warn("Navegador impediu a tela cheia automática.");
         });
     }
-
-    // Adiciona event listeners de segurança
+    
+    // Adiciona os listeners de segurança
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Inicia a verificação contínua de tela cheia
+    // **A MUDANÇA MAIS IMPORTANTE ESTÁ AQUI**
+    // Adiciona listeners que reagem instantaneamente à mudança de tela cheia
+    document.addEventListener('fullscreenchange', checkFullscreen);
+    document.addEventListener('webkitfullscreenchange', checkFullscreen); // Para compatibilidade com Safari/Chrome antigo
+
+    // O intervalo agora serve apenas como uma garantia extra
     if (fullscreenCheckInterval) clearInterval(fullscreenCheckInterval);
     fullscreenCheckInterval = setInterval(checkFullscreen, 1000);
+    
+    // Roda a verificação uma vez no início para garantir o estado correto
+    checkFullscreen();
 }
 
+/**
+ * Função ATUALIZADA para desabilitar o modo de prova.
+ * Agora remove os listeners do evento 'fullscreenchange'.
+ */
 function disableExamMode() {
     isExamMode = false;
     document.body.classList.remove('exam-mode');
-
-    // Para a verificação de tela cheia
+    
+    // Para a verificação contínua
     if (fullscreenCheckInterval) {
         clearInterval(fullscreenCheckInterval);
         fullscreenCheckInterval = null;
     }
-    // Garante que o aviso seja escondido
-    checkFullscreen();
+    
+    // Remove os listeners de segurança
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('contextmenu', handleContextMenu);
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    
+    // **REMOVE OS LISTENERS DA TELA CHEIA**
+    document.removeEventListener('fullscreenchange', checkFullscreen);
+    document.removeEventListener('webkitfullscreenchange', checkFullscreen);
+
+    // Garante que o aviso seja escondido ao sair
+    const warningOverlay = document.getElementById('fullscreenWarning');
+    if (warningOverlay) warningOverlay.style.display = 'none';
 
     // Sai da tela cheia se ainda estiver ativa
     if (document.exitFullscreen && document.fullscreenElement) {
         document.exitFullscreen();
     }
-
-    // Remove event listeners
-    document.removeEventListener('visibilitychange', handleVisibilityChange);
-    document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('contextmenu', handleContextMenu);
-    window.removeEventListener('beforeunload', handleBeforeUnload);
 }
 
 function handleVisibilityChange() {
@@ -1072,6 +1103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+     // Adicione esta parte no final, dentro da função
     document.getElementById('enterFullscreenBtn').addEventListener('click', () => {
         if (document.documentElement.requestFullscreen) {
             document.documentElement.requestFullscreen();
