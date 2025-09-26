@@ -545,7 +545,9 @@ async function loadRespostas(provaId) {
     const respostas = await apiRequest('resposta');
     if (!respostas || !respostas.data) return;
     
-    const provaRespostas = respostas.data.filter(r => r.id_prova == provaId);
+    // A MUDANÇA ESTÁ AQUI: Convertemos ambos os IDs para String para garantir a comparação correta.
+    const provaRespostas = respostas.data.filter(r => String(r.id_prova) === String(provaId));
+    
     const respostasList = document.getElementById('respostasList');
     respostasList.innerHTML = '';
     
@@ -831,15 +833,22 @@ function enableExamMode() {
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // APENAS ESTE EVENTO VAI CONTAR A SAÍDA
+    // Listener para quando o ALUNO TROCA DE ABA/JANELA
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             incrementExitCounter();
         }
     });
 
-    // ESTE EVENTO APENAS CONTROLA O AVISO VISUAL DE TELA CHEIA
-    const fullscreenChangeHandler = () => checkFullscreen();
+    // Listener para quando o ALUNO SAI DA TELA CHEIA (ESC ou F11)
+    const fullscreenChangeHandler = () => {
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            // Apenas chama o contador se a prova já estiver iniciada (sem carência)
+            incrementExitCounter();
+        }
+        // Esta função apenas cuida do AVISO VISUAL, não da contagem
+        checkFullscreen();
+    };
     document.addEventListener('fullscreenchange', fullscreenChangeHandler);
     document.addEventListener('webkitfullscreenchange', fullscreenChangeHandler);
 
