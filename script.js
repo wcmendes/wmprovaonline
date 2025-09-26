@@ -767,44 +767,58 @@ function showExamScreen() {
     enableExamMode();
 }
 
+let fullscreenCheckInterval = null;
+
+function checkFullscreen() {
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    const warningOverlay = document.getElementById('fullscreenWarning');
+
+    if (isExamMode && !isFullscreen) {
+        warningOverlay.style.display = 'flex';
+    } else if (warningOverlay) {
+        warningOverlay.style.display = 'none';
+    }
+}
+
 function enableExamMode() {
     isExamMode = true;
     document.body.classList.add('exam-mode');
-    
-    // Solicita a tela cheia
+
+    // Tenta entrar em tela cheia
     if (document.documentElement.requestFullscreen) {
         document.documentElement.requestFullscreen().catch(err => {
-            showAlert('Aviso', `Por favor, ative o modo de tela cheia para continuar a prova.`);
+            console.warn("Não foi possível entrar em tela cheia automaticamente.");
         });
     }
 
-    // Adiciona listeners de segurança
+    // Adiciona event listeners de segurança
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Adiciona verificação contínua de tela cheia (NOVA)
-    examTimer = setInterval(checkFullscreen, 2000); 
-}
-
-function checkFullscreen() {
-    if (isExamMode && !document.fullscreenElement) {
-        showAlert('Modo Tela Cheia Necessário', 'Por favor, reative o modo de tela cheia para continuar a prova.');
-        // Opcional: Pausar o timer ou bloquear a interface aqui
-    }
+    // Inicia a verificação contínua de tela cheia
+    if (fullscreenCheckInterval) clearInterval(fullscreenCheckInterval);
+    fullscreenCheckInterval = setInterval(checkFullscreen, 1000);
 }
 
 function disableExamMode() {
     isExamMode = false;
     document.body.classList.remove('exam-mode');
-    
-    // Exit fullscreen
-    if (document.exitFullscreen) {
+
+    // Para a verificação de tela cheia
+    if (fullscreenCheckInterval) {
+        clearInterval(fullscreenCheckInterval);
+        fullscreenCheckInterval = null;
+    }
+    // Garante que o aviso seja escondido
+    checkFullscreen();
+
+    // Sai da tela cheia se ainda estiver ativa
+    if (document.exitFullscreen && document.fullscreenElement) {
         document.exitFullscreen();
     }
-    clearInterval(examTimer); 
-    
+
     // Remove event listeners
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     document.removeEventListener('keydown', handleKeyDown);
@@ -905,7 +919,7 @@ async function finishExam(autoFinish = false) {
         tentativas_de_sair: exitAttempts
     };
     
-    const result = await apiRequest('resposta', 'POST', updateData);
+    const result = await apiRequest('resposta', 'PUT', updateData); 
     
     disableExamMode();
     
@@ -1057,6 +1071,12 @@ document.addEventListener('DOMContentLoaded', function() {
             e.target.value = value;
         }
     });
+
+    document.getElementById('enterFullscreenBtn').addEventListener('click', () => {
+        if (document.documentElement.requestFullscreen) {
+            document.documentElement.requestFullscreen();
+        }
+    });
 });
 
 // Global functions for HTML onclick events
@@ -1159,7 +1179,7 @@ async function editNotaDiscursiva(respostaId) {
             nota_final: (resposta.nota_objetiva || 0) + nota
         };
         
-        const result = await apiRequest('resposta', 'POST', updateData);
+        const result = await apiRequest('resposta', 'PUT', updateData);
         if (result && result.success) {
             closeNotaDiscursiva();
             const provaId = document.getElementById('provaSelectRespostas').value;
