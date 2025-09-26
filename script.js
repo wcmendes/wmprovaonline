@@ -66,12 +66,12 @@ function formatDateTime(dateTimeString) {
 }
 
 function formatCPF(cpf) {
-    // Se o CPF não for um texto válido (ou estiver vazio), retorna uma string vazia.
-    if (typeof cpf !== 'string' || !cpf) {
+    // Se o CPF não existir (for nulo ou vazio), retorna uma string vazia.
+    if (!cpf) {
         return '';
     }
-    // Se for um texto válido, formata normalmente.
-    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    // Converte o CPF para String (texto) e então aplica a formatação.
+    return String(cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
 function validateCPF(cpf) {
