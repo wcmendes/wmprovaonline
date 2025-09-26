@@ -3,25 +3,30 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches:
-      - main # Roda sempre que houver uma atualização na branch 'main'
+      - main
 
-# Adiciona as permissões necessárias para o robô modificar o repositório
 permissions:
   contents: write
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    
+    # Adicionamos este bloco para forçar a leitura do segredo
+    env:
+      API_KEY_SECRET: ${{ secrets.SECRET_API_SHEETS }}
+
     steps:
       - name: Checkout 🛎️
         uses: actions/checkout@v3
 
       - name: Create config.js file 🤫
+        # Agora usamos a variável de ambiente que criamos acima
         run: |
-          echo "const API_KEY = '${{ secrets.SECRET_API_SHEETS }}';" > config.js
+          echo "const API_KEY = '${{ env.API_KEY_SECRET }}';" > config.js
         
       - name: Deploy 🚀
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages # A branch onde o site será publicado
-          folder: . # Publica a raiz do projeto (incluindo o novo config.js) 
+          branch: gh-pages
+          folder: .
