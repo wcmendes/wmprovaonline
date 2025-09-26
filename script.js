@@ -10,6 +10,7 @@ let examDuration = 0;
 let examQuestions = [];
 let studentAnswers = {};
 let studentResponseId = null; 
+let currentStudentResponse = null;
 let exitAttempts = 0;
 let isExamMode = false;
 
@@ -636,6 +637,7 @@ async function startExam(studentData) {
         
         if (existingResponse) {
             // Resume exam
+            currentStudentResponse = existingResponse;
             studentResponseId = existingResponse.id_resposta;
             currentExam = activeExam;
             studentAnswers = JSON.parse(existingResponse.respostas || '{}');
@@ -658,7 +660,8 @@ async function startExam(studentData) {
         respostas: '{}',
         tentativas_de_sair: 0,
     };
-    studentResponseId = responseData.id_resposta; // Adicione esta linha
+    currentStudentResponse = responseData; 
+    studentResponseId = responseData.id_resposta; 
 
     const result = await apiRequest('resposta', 'POST', responseData);
     if (result && result.success) {
@@ -943,6 +946,7 @@ async function finishExam(autoFinish = false) {
     
     // Update response
     const updateData = {
+        ...currentStudentResponse, // Começa com todos os dados originais do aluno
         id_resposta: studentResponseId,
         respostas: JSON.stringify(studentAnswers),
         hora_fim: new Date().toISOString(),
