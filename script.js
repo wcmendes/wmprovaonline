@@ -66,10 +66,11 @@ function formatDateTime(dateTimeString) {
 }
 
 function formatCPF(cpf) {
-    // Se o CPF não for um texto válido, retorna uma string vazia.
+    // Se o CPF não for um texto válido (ou estiver vazio), retorna uma string vazia.
     if (typeof cpf !== 'string' || !cpf) {
         return '';
     }
+    // Se for um texto válido, formata normalmente.
     return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
 }
 
@@ -1241,19 +1242,19 @@ async function editNotaDiscursiva(respostaId) {
     
     const notaAtual = resposta.nota_discursiva || 0;
     
+    // O código abaixo cria o pop-up para editar a nota
     const modalContent = `
-        <div class="form-modal" style="display: flex;">
+        <div id="notaModal" class="form-modal" style="display: flex;">
             <div class="form-card">
                 <h3>Editar Nota Discursiva</h3>
                 <p><strong>Aluno:</strong> ${resposta.nome}</p>
-                <p><strong>Nota Objetiva:</strong> ${resposta.nota_objetiva || 0}</p>
                 <form id="notaDiscursivaForm">
                     <div class="form-group">
-                        <label for="notaDiscursiva">Nota Discursiva:</label>
-                        <input type="number" id="notaDiscursiva" step="0.1" value="${notaAtual}" required>
+                        <label for="notaDiscursivaInput">Nota Discursiva:</label>
+                        <input type="number" id="notaDiscursivaInput" step="0.1" value="${notaAtual}" required>
                     </div>
                     <div class="button-group">
-                        <button type="submit" class="btn btn-primary">Salvar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Nota</button>
                         <button type="button" class="btn btn-secondary" onclick="closeNotaDiscursiva()">Cancelar</button>
                     </div>
                 </form>
@@ -1263,21 +1264,26 @@ async function editNotaDiscursiva(respostaId) {
     
     document.body.insertAdjacentHTML('beforeend', modalContent);
     
+    // Adiciona o evento de submit ao formulário do pop-up
     document.getElementById('notaDiscursivaForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const nota = parseFloat(document.getElementById('notaDiscursiva').value);
-        
+        const novaNotaDiscursiva = parseFloat(document.getElementById('notaDiscursivaInput').value);
+        const notaObjetiva = parseFloat(resposta.nota_objetiva) || 0;
+
+        // CRIA O OBJETO DE DADOS COMPLETO PARA ATUALIZAÇÃO
         const updateData = {
-            id_resposta: respostaId,
-            nota_discursiva: nota,
-            nota_final: (resposta.nota_objetiva || 0) + nota
+            ...resposta, // Copia todos os dados existentes da resposta
+            nota_discursiva: novaNotaDiscursiva, // Atualiza a nota discursiva
+            nota_final: notaObjetiva + novaNotaDiscursiva // Recalcula a nota final
         };
         
+        // USA O MÉTODO 'PUT' PARA ATUALIZAR A LINHA SEM APAGAR NADA
         const result = await apiRequest('resposta', 'PUT', updateData);
+
         if (result && result.success) {
             closeNotaDiscursiva();
             const provaId = document.getElementById('provaSelectRespostas').value;
-            loadRespostas(provaId);
+            loadRespostas(provaId); // Recarrega a lista para mostrar a nota atualizada
             showAlert('Sucesso', 'Nota discursiva salva com sucesso!');
         } else {
             showAlert('Erro', 'Erro ao salvar nota discursiva.');
@@ -1285,8 +1291,9 @@ async function editNotaDiscursiva(respostaId) {
     });
 }
 
+// Garanta que a função para fechar o modal também exista
 function closeNotaDiscursiva() {
-    const modal = document.querySelector('.form-modal:last-child');
+    const modal = document.getElementById('notaModal');
     if (modal) {
         modal.remove();
     }
