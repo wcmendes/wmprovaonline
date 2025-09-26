@@ -18,7 +18,6 @@ let lastExitTimestamp = 0;
 
 // API Configuration
 const API_BASE = 'https://script.google.com/macros/s/AKfycbwr4CwGenJ8Gf10svE3zOA_QiQJ3kAyZ9KyqNUT0NGQkImmJ68MkOX_tZnjFCJOD8XA/exec';
-const API_KEY = 'carambola@01';
 
 // Utility Functions
 function showLoading() {

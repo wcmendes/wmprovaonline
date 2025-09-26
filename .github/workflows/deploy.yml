@@ -1,0 +1,23 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main  # Ou a branch que você usa como principal
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Create config.js file 🤫
+        run: |
+          echo "const API_KEY = '${{ secrets.SECRET_API_SHEETS }}';" > config.js
+        
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages # A branch onde o site será publicado
+          folder: . # Publica a raiz do projeto
