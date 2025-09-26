@@ -1153,28 +1153,35 @@ window.saveAnswer = saveAnswer;
 
 // Additional functions for viewing responses and editing discursive grades
 async function viewRespostas(respostaId) {
-    showLoading(); // Mostra o loading
-    const respostas = await apiRequest('resposta');
-    const questoes = await apiRequest('questao');
-    hideLoading(); // Esconde o loading
+    showLoading();
+    const [respostas, questoes] = await Promise.all([
+        apiRequest('resposta'),
+        apiRequest('questao')
+    ]);
+    hideLoading();
 
     if (!respostas || !respostas.data || !questoes || !questoes.data) {
-        showAlert('Erro', 'Não foi possível carregar os dados da prova.');
+        showAlert('Erro', 'Não foi possível carregar os dados necessários.');
         return;
     }
 
     const resposta = respostas.data.find(r => r.id_resposta == respostaId);
-    if (!resposta) return;
+    if (!resposta) {
+        showAlert('Erro', 'Registro de resposta não encontrado.');
+        return;
+    }
 
     const provaQuestoes = questoes.data.filter(q => q.id_prova == resposta.id_prova);
     
     let respostasData = {};
-    try {
-        // Tenta interpretar o JSON das respostas
-        respostasData = JSON.parse(resposta.respostas || '{}');
-    } catch (e) {
-        console.error("Erro ao processar JSON das respostas:", resposta.respostas);
-        // Se falhar, o objeto continuará vazio, mas a função não vai quebrar
+    // Esta parte agora verifica se o campo 'respostas' existe e não está vazio
+    if (resposta.respostas && typeof resposta.respostas === 'string' && resposta.respostas.trim().length > 2) {
+        try {
+            // Tenta interpretar o JSON das respostas
+            respostasData = JSON.parse(resposta.respostas);
+        } catch (e) {
+            console.error("Erro ao processar JSON das respostas:", resposta.respostas, e);
+        }
     }
     
     const modalContentEl = document.getElementById('viewResponseContent');
@@ -1184,7 +1191,7 @@ async function viewRespostas(respostaId) {
     `;
     
     provaQuestoes.forEach((questao, index) => {
-        const respAluno = respostasData[questao.id_questao] || '<i>Não respondida ou com erro de formatação.</i>';
+        const respAluno = respostasData[questao.id_questao] || '<i>Não respondida.</i>';
         
         modalContent += `
             <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
