@@ -9,6 +9,7 @@ let examStartTime = null;
 let examDuration = 0;
 let examQuestions = [];
 let studentAnswers = {};
+let studentResponseId = null; 
 let exitAttempts = 0;
 let isExamMode = false;
 
@@ -635,6 +636,7 @@ async function startExam(studentData) {
         
         if (existingResponse) {
             // Resume exam
+            studentResponseId = existingResponse.id_resposta;
             currentExam = activeExam;
             studentAnswers = JSON.parse(existingResponse.respostas || '{}');
             examStartTime = new Date(existingResponse.hora_login);
@@ -654,9 +656,10 @@ async function startExam(studentData) {
         ip: await getUserIP(),
         hora_login: new Date().toISOString(),
         respostas: '{}',
-        tentativas_de_sair: 0
+        tentativas_de_sair: 0,
     };
-    
+    studentResponseId = responseData.id_resposta; // Adicione esta linha
+
     const result = await apiRequest('resposta', 'POST', responseData);
     if (result && result.success) {
         currentExam = activeExam;
@@ -768,16 +771,28 @@ function enableExamMode() {
     isExamMode = true;
     document.body.classList.add('exam-mode');
     
-    // Request fullscreen
+    // Solicita a tela cheia
     if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen();
+        document.documentElement.requestFullscreen().catch(err => {
+            showAlert('Aviso', `Por favor, ative o modo de tela cheia para continuar a prova.`);
+        });
     }
-    
-    // Add event listeners for security
+
+    // Adiciona listeners de segurança
     document.addEventListener('visibilitychange', handleVisibilityChange);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Adiciona verificação contínua de tela cheia (NOVA)
+    examTimer = setInterval(checkFullscreen, 2000); 
+}
+
+function checkFullscreen() {
+    if (isExamMode && !document.fullscreenElement) {
+        showAlert('Modo Tela Cheia Necessário', 'Por favor, reative o modo de tela cheia para continuar a prova.');
+        // Opcional: Pausar o timer ou bloquear a interface aqui
+    }
 }
 
 function disableExamMode() {
@@ -788,6 +803,7 @@ function disableExamMode() {
     if (document.exitFullscreen) {
         document.exitFullscreen();
     }
+    clearInterval(examTimer); 
     
     // Remove event listeners
     document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -882,6 +898,7 @@ async function finishExam(autoFinish = false) {
     
     // Update response
     const updateData = {
+        id_resposta: studentResponseId,
         respostas: JSON.stringify(studentAnswers),
         hora_fim: new Date().toISOString(),
         nota_objetiva: objectiveScore,
@@ -1065,11 +1082,10 @@ async function viewRespostas(respostaId) {
     const provaQuestoes = questoes.data.filter(q => q.id_prova == resposta.id_prova);
     const respostasData = JSON.parse(resposta.respostas || '{}');
     
+    const modalContentEl = document.getElementById('viewResponseContent');
     let modalContent = `
-        <div class="form-modal" style="display: flex;">
-            <div class="form-card" style="max-width: 800px;">
-                <h3>Respostas de ${resposta.nome}</h3>
-                <div style="max-height: 70vh; overflow-y: auto;">
+        <h3>Respostas de ${resposta.nome}</h3>
+        <div style="max-height: 70vh; overflow-y: auto;">
     `;
     
     provaQuestoes.forEach((questao, index) => {
@@ -1086,23 +1102,21 @@ async function viewRespostas(respostaId) {
     });
     
     modalContent += `
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-secondary" onclick="closeViewRespostas()">Fechar</button>
-                </div>
-            </div>
+        </div>
+        <div class="button-group">
+            <button class="btn btn-secondary" onclick="closeViewRespostas()">Fechar</button>
         </div>
     `;
     
-    document.body.insertAdjacentHTML('beforeend', modalContent);
+    modalContentEl.innerHTML = modalContent;
+    document.getElementById('viewResponseModal').style.display = 'flex';
 }
 
 function closeViewRespostas() {
-    const modal = document.querySelector('.form-modal:last-child');
-    if (modal) {
-        modal.remove();
-    }
+    document.getElementById('viewResponseModal').style.display = 'none';
+    document.getElementById('viewResponseContent').innerHTML = ''; // Limpa o conteúdo
 }
+
 
 async function editNotaDiscursiva(respostaId) {
     const respostas = await apiRequest('resposta');
