@@ -799,8 +799,8 @@ function incrementExitCounter() {
     if (!isExamMode || initialGracePeriod) return;
 
     const now = Date.now();
-    // Impede que múltiplos eventos (blur, visibilitychange) contem como saídas separadas
-    if (now - lastExitTimestamp < 1500) {
+    // Se a última saída foi a menos de 2 segundos atrás, ignora esta.
+    if (now - lastExitTimestamp < 2000) {
         return;
     }
     lastExitTimestamp = now;
@@ -816,16 +816,14 @@ function incrementExitCounter() {
 // Função ATUALIZADA para habilitar o modo de prova
 function enableExamMode() {
     isExamMode = true;
-    initialGracePeriod = true;
+    initialGracePeriod = true; // Ativa o período de carência
     lastExitTimestamp = 0;
-    setTimeout(() => { initialGracePeriod = false; }, 3000); // Período de carência de 3s
+    setTimeout(() => { initialGracePeriod = false; }, 3000); // Carência de 3s para não contar a 1ª saída
 
     document.body.classList.add('exam-mode');
     
     if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(err => {
-            console.warn("Navegador impediu a tela cheia automática.");
-        });
+        document.documentElement.requestFullscreen().catch(() => {});
     }
     
     // Listeners de Segurança
@@ -833,20 +831,18 @@ function enableExamMode() {
     document.addEventListener('contextmenu', handleContextMenu);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
-    // Listeners para detectar a saída do aluno
+    // APENAS ESTE EVENTO VAI CONTAR A SAÍDA
     document.addEventListener('visibilitychange', () => {
-        if (document.hidden) incrementExitCounter();
-    });
-    document.addEventListener('fullscreenchange', () => {
-        if (!document.fullscreenElement) incrementExitCounter();
-        checkFullscreen(); // Esta função agora SÓ cuida do aviso visual
-    });
-    document.addEventListener('webkitfullscreenchange', () => { // Compatibilidade
-        if (!document.webkitFullscreenElement) incrementExitCounter();
-        checkFullscreen();
+        if (document.hidden) {
+            incrementExitCounter();
+        }
     });
 
-    // Verificação contínua para o aviso visual
+    // ESTE EVENTO APENAS CONTROLA O AVISO VISUAL DE TELA CHEIA
+    const fullscreenChangeHandler = () => checkFullscreen();
+    document.addEventListener('fullscreenchange', fullscreenChangeHandler);
+    document.addEventListener('webkitfullscreenchange', fullscreenChangeHandler);
+
     if (fullscreenCheckInterval) clearInterval(fullscreenCheckInterval);
     fullscreenCheckInterval = setInterval(checkFullscreen, 500);
     
@@ -1161,26 +1157,21 @@ async function viewRespostas(respostaId) {
     hideLoading();
 
     if (!respostas || !respostas.data || !questoes || !questoes.data) {
-        showAlert('Erro', 'Não foi possível carregar os dados necessários.');
-        return;
+        return showAlert('Erro', 'Não foi possível carregar os dados necessários.');
     }
 
     const resposta = respostas.data.find(r => r.id_resposta == respostaId);
-    if (!resposta) {
-        showAlert('Erro', 'Registro de resposta não encontrado.');
-        return;
-    }
+    if (!resposta) return showAlert('Erro', 'Registro de resposta não encontrado.');
 
     const provaQuestoes = questoes.data.filter(q => q.id_prova == resposta.id_prova);
     
     let respostasData = {};
-    // Esta parte agora verifica se o campo 'respostas' existe e não está vazio
-    if (resposta.respostas && typeof resposta.respostas === 'string' && resposta.respostas.trim().length > 2) {
+    // A linha mais importante: lê o JSON puro da planilha
+    if (resposta.respostas && typeof resposta.respostas === 'string' && resposta.respostas.length > 2) {
         try {
-            // Tenta interpretar o JSON das respostas
             respostasData = JSON.parse(resposta.respostas);
         } catch (e) {
-            console.error("Erro ao processar JSON das respostas:", resposta.respostas, e);
+            console.error("O JSON na planilha está corrompido:", resposta.respostas, e);
         }
     }
     
@@ -1197,7 +1188,7 @@ async function viewRespostas(respostaId) {
             <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
                 <h4>Questão ${index + 1} (${questao.tipo})</h4>
                 <p><strong>Enunciado:</strong> ${questao.enunciado}</p>
-                <p><strong>Resposta do aluno:</strong> ${respAluno}</p>
+                <p><strong>Resposta do aluno:</strong><pre style="white-space: pre-wrap; word-wrap: break-word; margin-top: 5px;">${respAluno}</pre></p>
                 ${questao.tipo === 'objetiva' ? `<p><strong>Resposta correta:</strong> ${questao.resposta_correta}</p>` : ''}
                 <p><strong>Peso:</strong> ${questao.peso}</p>
             </div>
