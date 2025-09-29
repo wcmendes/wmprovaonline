@@ -1,0 +1,42 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    # ADICIONE ESTA LINHA PARA CONECTAR AO AMBIENTE DO SEGREDO
+    environment: github-pages
+
+    env:
+      API_KEY_SECRET: ${{ secrets.SECRET_API_SHEETS }}
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@v3
+
+      - name: Verify Secret Presence 🕵️
+        run: |
+          if [ -z "${{ env.API_KEY_SECRET }}" ]; then
+            echo "::error::ERRO FATAL: O segredo SECRET_API_SHEETS está vazio ou não foi encontrado no ambiente 'github-pages'."
+            exit 1
+          else
+            echo "Segredo encontrado com sucesso."
+          fi
+
+      - name: Create config.js file 🤫
+        run: |
+          echo "const API_KEY = '${{ env.API_KEY_SECRET }}';" > config.js
+        
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: .

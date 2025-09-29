@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WM Prova Online</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="fullscreenWarning" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; z-index: 9999; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px;">
+        <h2>Modo Tela Cheia Obrigatório</h2>
+        <p style="margin: 1rem 0;">Para realizar a prova, é necessário estar em modo tela cheia. Por favor, pressione a tecla F11 ou clique no botão abaixo.</p>
+        <button id="enterFullscreenBtn" class="btn btn-primary" style="margin-top: 20px;">Entrar em Tela Cheia</button>
+    </div>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1 class="logo">WM Prova Online</h1>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <span id="userName"></span>
+                <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Home Screen -->
+            <div id="homeScreen" class="screen active">
+                <div class="welcome-card">
+                    <h2>Bem-vindo ao WM Prova Online</h2>
+                    <p>Sistema de provas online para professores e alunos</p>
+                    <div class="button-group">
+                        <button id="professorLoginBtn" class="btn btn-primary">Login Professor</button>
+                        <button id="studentAccessBtn" class="btn btn-primary">Acesso do Aluno</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Professor Login Screen -->
+            <div id="professorLoginScreen" class="screen">
+                <div class="login-card">
+                    <h2>Login do Professor</h2>
+                    <form id="professorLoginForm">
+                        <div class="form-group">
+                            <label for="professorUser">Usuário:</label>
+                            <input type="text" id="professorUser" name="usuario" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="professorPassword">Senha:</label>
+                            <input type="password" id="professorPassword" name="senha" required>
+                        </div>
+                        <div class="button-group">
+                            <button type="submit" class="btn btn-primary">Entrar</button>
+                            <button type="button" id="backToHomeFromLogin" class="btn btn-secondary">Voltar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Professor Dashboard -->
+            <div id="professorDashboard" class="screen">
+                <div class="dashboard">
+                    <h2>Dashboard do Professor</h2>
+                    <div class="dashboard-tabs">
+                        <button class="tab-btn active" data-tab="provas">Provas</button>
+                        <button class="tab-btn" data-tab="questoes">Questões</button>
+                        <button class="tab-btn" data-tab="respostas">Respostas</button>
+                    </div>
+
+                    <!-- Provas Tab -->
+                    <div id="provasTab" class="tab-content active">
+                        <div class="tab-header">
+                            <h3>Gerenciar Provas</h3>
+                            <button id="addProvaBtn" class="btn btn-primary">Nova Prova</button>
+                        </div>
+                        <div id="provasList" class="items-list"></div>
+                        
+                        <!-- Add/Edit Prova Form -->
+                        <div id="provaForm" class="form-modal" style="display: none;">
+                            <div class="form-card">
+                                <h3 id="provaFormTitle">Nova Prova</h3>
+                                <form id="provaFormElement">
+                                    <input type="hidden" id="provaId" name="id_prova">
+                                    <div class="form-group">
+                                        <label for="provaTitulo">Título:</label>
+                                        <input type="text" id="provaTitulo" name="titulo" required>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="provaDataInicio">Data/Hora Início:</label>
+                                            <input type="datetime-local" id="provaDataInicio" name="data_inicio" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="provaDataFim">Data/Hora Fim:</label>
+                                            <input type="datetime-local" id="provaDataFim" name="data_fim" required>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="provaDuracao">Duração (minutos):</label>
+                                            <input type="number" id="provaDuracao" name="duracao_minutos" required>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="provaNotaMaxima">Nota Máxima:</label>
+                                            <input type="number" id="provaNotaMaxima" name="nota_maxima" step="0.1" required>
+                                        </div>
+                                    </div>
+                                    <div class="button-group">
+                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                        <button type="button" id="cancelProvaForm" class="btn btn-secondary">Cancelar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Questões Tab -->
+                    <div id="questoesTab" class="tab-content">
+                        <div class="tab-header">
+                            <h3>Gerenciar Questões</h3>
+                            <select id="provaSelectQuestoes" class="form-select">
+                                <option value="">Selecione uma prova</option>
+                            </select>
+                            <button id="addQuestaoBtn" class="btn btn-primary" disabled>Nova Questão</button>
+                        </div>
+                        <div id="questoesList" class="items-list"></div>
+                        
+                        <!-- Add/Edit Questão Form -->
+                        <div id="questaoForm" class="form-modal" style="display: none;">
+                            <div class="form-card">
+                                <h3 id="questaoFormTitle">Nova Questão</h3>
+                                <form id="questaoFormElement">
+                                    <input type="hidden" id="questaoId" name="id_questao">
+                                    <input type="hidden" id="questaoProvaId" name="id_prova">
+                                    <div class="form-group">
+                                        <label for="questaoTipo">Tipo:</label>
+                                        <select id="questaoTipo" name="tipo" required>
+                                            <option value="objetiva">Objetiva</option>
+                                            <option value="discursiva">Discursiva</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="questaoEnunciado">Enunciado:</label>
+                                        <textarea id="questaoEnunciado" name="enunciado" rows="3" required></textarea>
+                                    </div>
+                                    <div id="opcoesObjetivas">
+                                        <div class="form-group">
+                                            <label for="opcaoA">Opção A:</label>
+                                            <input type="text" id="opcaoA" name="opcao_a">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="opcaoB">Opção B:</label>
+                                            <input type="text" id="opcaoB" name="opcao_b">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="opcaoC">Opção C:</label>
+                                            <input type="text" id="opcaoC" name="opcao_c">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="opcaoD">Opção D:</label>
+                                            <input type="text" id="opcaoD" name="opcao_d">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="opcaoE">Opção E:</label>
+                                            <input type="text" id="opcaoE" name="opcao_e">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="respostaCorreta">Resposta Correta:</label>
+                                            <select id="respostaCorreta" name="resposta_correta">
+                                                <option value="A">A</option>
+                                                <option value="B">B</option>
+                                                <option value="C">C</option>
+                                                <option value="D">D</option>
+                                                <option value="E">E</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="questaoPeso">Peso:</label>
+                                        <input type="number" id="questaoPeso" name="peso" step="0.1" required>
+                                    </div>
+                                    <div class="button-group">
+                                        <button type="submit" class="btn btn-primary">Salvar</button>
+                                        <button type="button" id="cancelQuestaoForm" class="btn btn-secondary">Cancelar</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Respostas Tab -->
+                    <div id="respostasTab" class="tab-content">
+                        <div class="tab-header">
+                            <h3>Respostas dos Alunos</h3>
+                            <select id="provaSelectRespostas" class="form-select">
+                                <option value="">Selecione uma prova</option>
+                            </select>
+                        </div>
+                        <div id="respostasList" class="items-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Access Screen -->
+            <div id="studentAccessScreen" class="screen">
+                <div class="student-card">
+                    <h2>Acesso do Aluno</h2>
+                    <form id="studentAccessForm">
+                        <div class="form-group">
+                            <label for="studentName">Nome Completo:</label>
+                            <input type="text" id="studentName" name="nome" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="studentEmail">Email:</label>
+                            <input type="email" id="studentEmail" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="studentCPF">CPF:</label>
+                            <input type="text" id="studentCPF" name="cpf" required maxlength="14" placeholder="000.000.000-00">
+                        </div>
+                        <div class="button-group">
+                            <button type="submit" class="btn btn-primary">Iniciar Prova</button>
+                            <button type="button" id="backToHomeFromStudent" class="btn btn-secondary">Voltar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Exam Screen -->
+            <div id="examScreen" class="screen">
+                <div class="exam-container">
+                    <div class="exam-header">
+                        <h2 id="examTitle">Prova</h2>
+                        <div class="timer-container">
+                            <span class="timer-label">Tempo restante:</span>
+                            <span id="timer" class="timer">00:00:00</span>
+                        </div>
+                    </div>
+                    
+                    <div class="exam-warnings">
+                        <div class="warning-box">
+                            <p><strong>Atenção:</strong></p>
+                            <ul>
+                                <li>O sistema registra tentativas de sair da janela e isso pode reduzir sua nota</li>
+                                <li>Copiar e colar está bloqueado durante a prova</li>
+                                <li>Mantenha-se em tela cheia durante toda a prova</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="examQuestions" class="exam-questions"></div>
+
+                    <div class="exam-footer">
+                        <button id="submitExamBtn" class="btn btn-primary">Finalizar Prova</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Result Screen -->
+            <div id="resultScreen" class="screen">
+                <div class="result-card">
+                    <h2>Prova Finalizada</h2>
+                    <div class="result-message">
+                        <p id="resultMessage">Prova finalizada com sucesso!</p>
+                    </div>
+                    <button id="backToHomeFromResult" class="btn btn-primary">Voltar ao Início</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>© 2025 William Corrêa Mendes</p>
+            <p>É permitida a reprodução, adaptação e distribuição, desde que seja dado o devido crédito ao autor.</p>
+        </div>
+    </footer>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p>Carregando...</p>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="alertTitle">Aviso</h3>
+            <p id="alertMessage"></p>
+            <button id="alertOkBtn" class="btn btn-primary">OK</button>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3 id="confirmTitle">Confirmação</h3>
+            <p id="confirmMessage"></p>
+            <div class="button-group">
+                <button id="confirmYesBtn" class="btn btn-primary">Sim</button>
+                <button id="confirmNoBtn" class="btn btn-secondary">Não</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewResponseModal" class="form-modal" style="display: none;">
+    <div id="viewResponseContent" class="form-card" style="max-width: 800px;">
+            </div>
+    </div>
+
+    <script src="config.js"></script><script src="script.js"></script>
+</body>
+</html>
+
