@@ -107,6 +107,10 @@
                                             <input type="number" id="provaNotaMaxima" name="nota_maxima" step="0.1" required>
                                         </div>
                                     </div>
+                                    <div class="form-group">
+                                        <label for="provaChave">Chave da Prova (senha para o aluno):</label>
+                                        <input type="text" id="provaChave" name="chave" placeholder="Ex: TURMA2025">
+                                    </div>
                                     <div class="button-group">
                                         <button type="submit" class="btn btn-primary">Salvar</button>
                                         <button type="button" id="cancelProvaForm" class="btn btn-secondary">Cancelar</button>
@@ -219,6 +223,13 @@
                         <div class="form-group">
                             <label for="studentCPF">CPF:</label>
                             <input type="text" id="studentCPF" name="cpf" required maxlength="14" placeholder="000.000.000-00">
+                        </div>
+                        <div class="form-group">
+                            <label for="studentKey">Chave da Prova:</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="studentKey" name="chave" required>
+                                <button type="button" id="togglePassword" class="toggle-password">👁️</button>
+                            </div>
                         </div>
                         <div class="button-group">
                             <button type="submit" class="btn btn-primary">Iniciar Prova</button>
