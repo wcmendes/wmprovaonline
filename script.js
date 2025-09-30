@@ -299,7 +299,8 @@ async function saveProva(formData) {
         data_inicio: formData.get("data_inicio"),
         data_fim: formData.get("data_fim"),
         duracao_minutos: parseInt(formData.get("duracao_minutos")),
-        nota_maxima: parseFloat(formData.get("nota_maxima"))
+        nota_maxima: parseFloat(formData.get("nota_maxima")),
+        chave: formData.get("chave") || "" 
     };
 
     let result;
@@ -332,6 +333,7 @@ function showProvaForm(prova = null) {
         form.data_fim.value = prova.data_fim;
         form.duracao_minutos.value = prova.duracao_minutos;
         form.nota_maxima.value = prova.nota_maxima;
+        form.chave.value = prova.chave || '';
     } else {
         title.textContent = 'Nova Prova';
         form.reset();
@@ -631,13 +633,19 @@ async function checkActiveExam() {
     return activeExam;
 }
 
-async function startExam(studentData) {
+async function startExam(studentData, studentKey) {
     const activeExam = await checkActiveExam();
     if (!activeExam) {
         showAlert('Erro', 'Não há prova ativa no momento.');
         return;
     }
-    
+    // Valida a chave
+    if (activeExam.chave && activeExam.chave !== studentKey) {
+        showAlert('Erro', 'Chave da prova incorreta. Verifique com seu professor.');
+        return;
+    }
+    // FIM DA VALIDAÇÃO
+
     // Check if student already has a response
     const respostas = await apiRequest('resposta');
     if (respostas && respostas.data) {
@@ -1066,7 +1074,9 @@ document.addEventListener('DOMContentLoaded', function() {
             cpf: cpf
         };
         
-        await startExam(studentData);
+        const studentKey = formData.get('chave'); 
+
+        await startExam(studentData, studentKey);
     });
     
     // Dashboard tabs
@@ -1156,6 +1166,19 @@ document.addEventListener('DOMContentLoaded', function() {
             document.documentElement.requestFullscreen();
         }
     });
+    
+    // Para poder ver a senha
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('studentKey');
+
+    if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function() {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            // Altera o ícone do olho (opcional, mas melhora a experiência)
+            this.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+    }
 });
 
 // Global functions for HTML onclick events
