@@ -1225,19 +1225,33 @@ async function viewRespostas(respostaId) {
     `;
     
     provaQuestoes.forEach((questao, index) => {
-        const respAluno = respostasData[questao.id_questao] || '<i>Não respondida.</i>';
-        
-        modalContent += `
-            <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
-                <h4>Questão ${index + 1} (${questao.tipo})</h4>
-                <p><strong>Enunciado:</strong> ${questao.enunciado}</p>
-                <p><strong>Resposta do aluno:</strong><pre style="white-space: pre-wrap; word-wrap: break-word; margin-top: 5px;">${respAluno}</pre></p>
-                ${questao.tipo === 'objetiva' ? `<p><strong>Resposta correta:</strong> ${questao.resposta_correta}</p>` : ''}
-                <p><strong>Peso:</strong> ${questao.peso}</p>
-            </div>
-        `;
+    const respAluno = respostasData[questao.id_questao] || '<i>Não respondida.</i>';
+    let respostaExibida = respAluno; // Variável para a resposta que será exibida
+
+    // Se for uma questão objetiva e tiver sido respondida
+    if (questao.tipo === 'objetiva' && respAluno !== '<i>Não respondida.</i>') {
+        // Constrói a chave para acessar a opção, ex: 'opcao_a'
+        const chaveOpcao = `opcao_${respAluno.toLowerCase()}`;
+        // Pega o texto da opção correspondente na questão
+        const textoOpcao = questao[chaveOpcao];
+
+        // Se o texto da opção existir, formata a exibição para "Letra - Texto da resposta"
+        if (textoOpcao) {
+            respostaExibida = `${respAluno} - ${textoOpcao}`;
+        }
+    }
+
+    modalContent += `
+        <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e1e5e9; border-radius: 8px;">
+            <h4>Questão ${index + 1} (${questao.tipo})</h4>
+            <p><strong>Enunciado:</strong> ${questao.enunciado}</p>
+            <p><strong>Resposta do aluno:</strong><pre style="white-space: pre-wrap; word-wrap: break-word; margin-top: 5px;">${respostaExibida}</pre></p>
+            ${questao.tipo === 'objetiva' ? `<p><strong>Resposta correta:</strong> ${questao.resposta_correta}</p>` : ''}
+            <p><strong>Peso:</strong> ${questao.peso}</p>
+        </div>
+    `;
     });
-    
+
     modalContent += `
         </div>
         <div class="button-group" style="margin-top: 20px;">
